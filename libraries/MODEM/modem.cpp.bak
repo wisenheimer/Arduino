@@ -1,0 +1,855 @@
+#include "modem.h"
+#include <myEEPROM.h>
+//#include <myEEPROM.h>
+
+#ifdef GEO_ENABLE
+  #include <geo.h>
+
+  GEO *geo_loc; 
+#endif
+
+#ifndef EEPROM_ENABLE_FOR_SMS
+  #define SMS_BUF_SIZE 70
+  char sms[SMS_BUF_SIZE];      
+#endif
+
+#ifdef NODE_MCU_BOARD
+	#define GSMSERIAL Serial
+#else
+	#include <SoftwareSerial.h>
+	#define GSMSERIAL GsmSerial
+	SoftwareSerial GsmSerial(RX, TX);
+#endif
+
+#ifdef SD_ENABLE
+
+#include <SD_card.h>
+extern SD_CARD *sd;
+
+#endif
+
+#ifdef GPRS_ENABLE
+
+bool link_state;   // состояние подключен или нет.
+
+typedef struct gprs_link
+{
+  char ip[16];  // ip адрес сервера
+  char channel; // канал. 0 или 1  
+} GPRS_LINK;
+
+GPRS_LINK *link;
+
+#endif
+
+// Опрашивает модем
+#define READ_COM() read_com()
+#define READ_COM_FIND(str)   strstr(text->GetText(),str)
+
+extern byte flags;
+
+byte NotSignalCount;
+
+// Отправляет текст смс на определенный номер
+
+//#define SMS_SEND {PRINT("->№");text->AddInt(SmsCount++);PRINT(" ");timePrint();FAST_PRINTLN(text->GetText());text->Clear();GuardIntervalTime=millis();}
+                 
+#define SMS_PRINT PRINT("->№");text->AddInt(SmsCount++);PRINT(" ");timePrint();FAST_PRINTLN(text->GetText());text->Clear();GuardIntervalTime=millis();timeSmsOpros=GuardIntervalTime
+/*
+#define SMS_SEND {if(GET_FLAG(SMS_ENABLE)){GSMSERIAL.println(SMS_TO_ADMIN);DELAY(500);GSMSERIAL.print(text->GetText()); \
+                  DELAY(500);GSMSERIAL.print((char)26);DELAY(500);SET_FLAG_ONE(SEND_MASSAGE);EEPROM_UPDATE(0,text->GetSize());EEPROM_write(EEPROM_SMS_ADDRESS+1,text->GetText(),text->GetSize());}SMS_PRINT}
+*/
+
+#define SMS_SEND {send_message();}
+
+#define M590_POWER {digitalWrite(BOOT_PIN,LOW);DELAY(500);digitalWrite(BOOT_PIN,HIGH);DELAY(3000);}
+
+void m590::send_sms() SMS_SEND
+
+#define WRITE_SMS_TO_EEPROM if(size){if(size>=EEPROM_SIZE-EEPROM_SMS_ADDRESS)size=EEPROM_SIZE-EEPROM_SMS_ADDRESS-1;EEPROM_UPDATE(EEPROM_SMS_ADDRESS+size,0x00);while(--size!=255){EEPROM_UPDATE(EEPROM_SMS_ADDRESS+size,*(text->GetText()+size));}}
+#define WRITE_SMS_TO_RAM    if(size){if(size>=SMS_BUF_SIZE)size=SMS_BUF_SIZE-1;memcpy(sms,text->GetText(),size);sms[size]=0x00;}
+
+/* Работа с флагом ошибок */
+#define MODEM_NOT_ANSWER        0x01
+#define MODEM_GET_ANATHER_WORD  0x02
+#define MODEM_NOT_SIGNAL        0x04
+#define MODEM_NOT_REGISTRED     0x08
+#define MODEM_GET_ERROR         0x10
+
+#define GET_FLAG_ERROR(flag)      flag_errors&(flag)
+#define SET_FLAG_ERROR_ONE(flag)  flag_errors|=(flag)  // устанавливает бит в 1
+#define SET_FLAG_ERROR_ZERO(flag) flag_errors&=~(flag) // устанавливает бит в 0
+
+/* Работа с флагом заданий */
+#define MODEM_NEED_RESET        0x01
+#define MODEM_NEED_RING_BRAEK   0x02
+#define MODEM_NEED_DEL_ALL_SMS  0x04
+#define MODEM_NEED_GET_TIME     0x08
+#define MODEM_NEED_SEND_SMS     0x10
+
+#define GET_FLAG_NEED(flag)      flag_need&(flag)
+#define SET_FLAG_NEED_ONE(flag)  flag_need|=(flag)  // устанавливает бит в 1
+#define SET_FLAG_NEED_ZERO(flag) flag_need&=~(flag) // устанавливает бит в 0
+
+void m590::send_message()
+{
+  byte size = text->GetSize();
+
+  if(GET_FLAG(SMS_ENABLE))
+  {
+
+#ifdef EEPROM_ENABLE_FOR_SMS
+
+    if(EEPROM_READ(EEPROM_SMS_ADDRESS))
+    {
+      // если есть текст смс, кладём его в буфер
+      text->AddText(" OldSms:");
+      int i = EEPROM_SMS_ADDRESS;
+      while(EEPROM_READ(i) && i < EEPROM_SIZE && text->GetFreeSpace())
+      {
+        text->AddChar(EEPROM_READ(i++));
+      }               
+    }
+#else
+
+    if(sms[0])
+    {
+      // если есть текст смс, кладём его в буфер
+      text->AddText(" OldSms:");
+      text->AddText(sms);    
+    }
+
+#endif
+
+    if(text->GetSize())
+    {
+      // записываем последнее смс
+#ifdef EEPROM_ENABLE_FOR_SMS
+      WRITE_SMS_TO_EEPROM
+#else
+      WRITE_SMS_TO_RAM
+#endif  
+
+#ifndef DEBUG_MODE    
+      // отправка смс
+      GSMSERIAL.println(SMS_TO_ADMIN);
+      DELAY(500);
+      GSMSERIAL.print(text->GetText());
+      DELAY(500);
+      GSMSERIAL.print((char)26);
+      DELAY(500);
+#endif
+
+      SMS_PRINT;
+    }   
+  }
+  else
+  { // если отправка запрещена
+    // Запишем последнее смс в EEPROM
+#ifdef EEPROM_ENABLE_FOR_SMS
+    WRITE_SMS_TO_EEPROM
+#else
+    WRITE_SMS_TO_RAM
+#endif   
+  }  
+}
+
+m590::m590(TEXT *t)
+{
+  text = t;
+  SmsCount = 0;
+  GuardIntervalTime = 0;
+}
+
+#define NUM_INIT_COMMAND 8
+
+byte m590::reinit()
+{
+  byte error = 0;
+#ifdef MODEM_ENABLE
+  byte count;  
+  
+#if !defined(NODE_MCU_BOARD)
+	GSMSERIAL.begin(MODEM_SPEED); // Устанавливаем скорость связи Ардуино и модема
+#endif
+  
+  timePrint(); PRINTLN("");
+
+  do
+  {
+    M590_POWER; // Включение GSM модуля
+    READ_COM();
+  }while(READ_COM_FIND(MODEM_STARTUP)==NULL);
+
+  //digitalWrite(BOOT_PIN,LOW);
+  DELAY(2000);
+
+  const __FlashStringHelper* cmd[NUM_INIT_COMMAND] = 
+  {
+#ifdef DEBUG_MODE
+    F("ATE1"),             // включаем эхо
+#else
+    F("ATE0"),             // выключаем эхо
+#endif
+    F("AT+CLIP=1"),        // Включаем АОН
+    F("AT+CMGF=1"),        // Формат СМС = ASCII текст
+    F("AT+IFC=1,1"),       // устанавливает программный контроль потоком передачи данных
+    F("AT+CSCS=\"GSM\""),  // Режим кодировки текста = GSM (только англ.)
+    F("AT+CNMI=2,2,0,0,0"),// Текст смс выводится в com-порт
+    F("AT+CCID"),          // Возвращает ID SIM карты. Если есть проблемы с SIM картой возвращает “ERROR”
+    F("AT+CNMI=1,1")       // команда включает отображение номера пришедшей СМСки +CMTI: «MT», <номер смски>
+    //F("AT+CNMI=2,2"),      // выводит сразу в сериал порт, не сохраняя в симкарте 
+    //F("AT+CMGD=1,4")       // удалить все прочитанные смс
+  };  
+
+  for(byte i = 0; i < NUM_INIT_COMMAND; i++)
+  {
+    count = 0;
+    do
+    {
+      if(error = simple_send_command(cmd[i], OK, 10000)) // если есть ошибка
+      {
+        if(error==MODEM_NOT_ANSWER) return error;
+        count++;
+        // если модем отвечает, повторим
+      }
+    }while(error && count < 5);
+  }
+  
+#endif
+
+  RingCount = 0;
+  NotSignalCount = 0;
+  SET_FLAG_ERROR_ZERO(MODEM_NOT_ANSWER);
+  SET_FLAG_NEED_ZERO(MODEM_NEED_RESET);
+
+  return error;
+}
+
+byte m590::init()
+{
+  byte error = 0;
+#ifdef MODEM_ENABLE
+  byte count;
+  
+  do
+  {
+    error = reinit();
+    if(!error)
+    {
+      do
+      {
+        DELAY(10000); // Ждем пока модем будет готов
+        error = simple_send_command(F("AT+COPS?"), "+COPS: 0", 1000);
+        if(error && error!=MODEM_GET_ANATHER_WORD)
+        {
+          return error; // модем не отвечает или выдаёт ошибку
+        }
+      } while(error);
+      
+      DELAY(5000);
+
+      if(!simple_send_command(MODEM_GET_SIGNAL, NOT_SIGNAL, 1000)) error = MODEM_NOT_SIGNAL;        
+    }
+  } while(error);
+
+  //send_command(F("AT+COPS=0,2"), OK);
+  
+  simple_send_command(GET_MODEM_TIME, OK, 100);
+
+#ifdef GEO_ENABLE
+  geo_loc = new GEO(4);
+  simple_send_command(F("AT+CREG=2"), OK, 5000);
+#endif
+
+  SET_FLAG_ZERO(RING | NO_CARRIER);
+  SET_FLAG_ONE(RING_ENABLE | SMS_ENABLE); // разрешаем звонки и смс
+
+  timeRebutOpros = millis();
+  timeSmsOpros = timeRebutOpros;
+
+#endif	
+
+#ifdef EEPROM_ENABLE_FOR_SMS
+
+  if(EEPROM_READ(EEPROM_FIRST_ON_ADDRESS) != EEPROM_FIRST_ON_FLAG)
+  {
+    EEPROM_UPDATE(EEPROM_FIRST_ON_ADDRESS, EEPROM_FIRST_ON_FLAG);
+    EEPROM_UPDATE(EEPROM_SMS_ADDRESS,0x00);
+  }
+
+#endif
+  flag_errors = 0;
+  
+  return error;
+}
+
+byte m590::read_com()
+{
+  if(text->GetSize())
+  {
+    FAST_PRINTLN(text->GetText());
+    text->Clear();
+  }
+  
+  while(GSMSERIAL.available())
+  {
+    text->AddChar(char(GSMSERIAL.read()));
+    DELAY(10);
+  }
+
+  return text->GetSize();
+}
+
+// очищаем текст от разделительных символов и отправляем админу
+void m590::send_text()
+{
+  char *p = text->GetText();
+  char *buf = new char[text->GetSize()+1];
+  int index = 0;
+	  
+  while(*p)
+  {
+    if(isprint(*p)) buf[index++] = *p;
+    p++;
+  }
+  buf[index] = 0x00;
+  send_command(RING_BREAK, OK, 5000); // разорвать соединение
+  FAST_PRINTLN(text->GetText());text->Clear();
+  text->AddText(buf);  
+  delete[] buf;
+  SMS_SEND; // отправляем админу смс о звонке
+}
+
+void m590::parser()
+{
+  char *p;
+  byte tmp=0xFF;
+
+  if(!text->GetSize()) return;
+/*
+ * ЗВОНОК
+ */
+  if (READ_COM_FIND("RING")!=NULL)
+  { // Если звонят (выполняется на каждый гудок)
+    if (READ_COM_FIND(ADMIN_PHONE)!=NULL) // Если телефон админа, то cчитаем гудки
+    {
+      RingCount++;
+      //if(!MODEM_SET_COMMAND(INCOMING_RING_BREAK, OK)) // разорвать соединение
+    }
+    else
+    {
+#ifdef RETRANSMISSION_SMS_OR_RING_TO_ADMIN      
+      send_text(); // отправляем админу сообщение о звонке
+#else
+      SET_FLAG_NEED_ONE(MODEM_NEED_RING_BRAEK); // разорвать соединение
+#endif           
+    }
+  }
+
+/*
+ * СМС
+ */
+  
+  if (READ_COM_FIND("+CMGS")!=NULL) // +CMGS: <mr> - индекс отправленного сообщения 
+  {
+    // удаляем все отправленные сообщения
+    SET_FLAG_NEED_ONE(MODEM_NEED_DEL_ALL_SMS); 
+  }
+  if (READ_COM_FIND("+CMTI")!=NULL) // получили номер смс в строке вида +CMTI: "SM",0
+  {       
+    // находим индекс смс в памяти модема
+    if((p = READ_COM_FIND(","))!=NULL)
+    {
+      tmp = atoi(p+1);
+      send_command(GET_SMS(tmp), "+CMGR", 5000); // получаем смс
+    }      
+  }
+
+  //  не проверено!!!
+  if (READ_COM_FIND("+CMGL:")!=NULL) // получили номер смс в строке вида +CMGL:1,
+  {       
+    // находим индекс смс в памяти модема
+    if((p = READ_COM_FIND(":"))!=NULL)
+    {
+      char buf[3];
+      byte i = 0;
+      p++;
+      while(isdigit(*p) && i < 2) buf[i++] = *p++;    
+      if(*p == ',')
+      {
+        tmp = atoi(buf);
+        send_command(GET_SMS(tmp), "+CMGR", 5000); // получаем смс
+      } 
+    }      
+  }
+
+  if (READ_COM_FIND("+CMT")!=NULL || READ_COM_FIND("+CMGR")!=NULL) // получаем смс
+  {
+    char sms_time[TIME_STRING_SIZE];
+    //вытаскиваем время из смс
+    bool res = get_time_from_sms(sms_time);
+
+    // https://istarik.ru/blog/arduino/68.html
+#ifdef RETRANSMISSION_SMS_OR_RING_TO_ADMIN
+    if (READ_COM_FIND(ADMIN_PHONE)==NULL) // не админ
+      send_text(); // отправляем админу полученную смс
+#endif
+    if(res) set_time(sms_time); // записываем время из смс в модем
+    if(tmp!=0xFF) send_command(DELETE_SMS(tmp), OK, 1000); // удаляем прочитанное сообщение
+    else SET_FLAG_NEED_ONE(MODEM_NEED_DEL_ALL_SMS);  // удаляем все отправленные сообщения    
+  }
+
+/*  
+#ifdef GET_SMS_ENABLE
+      // пока ничего нет
+#else
+      send_command(DELETE_ALL_SMS, OK); // удаление всех смс
+#endif
+*/
+
+ /* 
+  if(READ_COM_FIND("+CUSD")!=NULL) //сообщение о балансе
+  { 
+    char *p = READ_COM_FIND("Balance");
+    if(p!=NULL) // смотрим, что за команда
+    {
+      char *pp = strstr(p,",");
+      if(pp!=NULL)
+      {
+        memset(balance, 0x00, 13);
+        memcpy(balance,p,pp-p);   
+      }
+    }
+    MODEM_SET_COMMAND(DEL_ALL_READED_AND_SENT_SMS,OK);   
+  }
+*/  
+
+
+#ifdef GEO_ENABLE
+  if((p = READ_COM_FIND("+CREG:"))!=NULL)
+  {
+    while(*p && *p!='\"') p++;
+
+    if(*p)
+    {
+      p++;
+      char str[4];
+      unsigned int lac, cid;
+      
+      for(byte i = 0; i < 4; i++)
+        str[i] = *p++;
+      str[4] = 0x00;
+      // т.к. числа шестнадцатиричные
+      lac = strtol(str,NULL,16);
+      p+=3;
+      for(byte i = 0; i < 4; i++)
+        str[i] = *p++;
+      str[4] = 0x00;
+      cid = strtol(str,NULL,16);
+
+      /* добавляем в массив новую координату */
+      geo_loc->AddData(lac, cid);
+      
+      if(GET_FLAG(SEND_GEO_DATA))
+      {
+        SET_FLAG_ZERO(SEND_GEO_DATA);
+        SET_FLAG_ONE(GEO_DATA_OK);
+      }       
+    } 
+  }
+#endif
+
+  if(READ_COM_FIND(SEND_SMS_OK)!=NULL)
+  {
+#ifdef EEPROM_ENABLE_FOR_SMS
+    EEPROM_UPDATE(EEPROM_SMS_ADDRESS, 0x00); // смс успешно отправлено
+#else
+    memset(sms, 0x00, SMS_BUF_SIZE);
+#endif 
+  }
+
+  if(READ_COM_FIND("NO CARRIER")!=NULL)
+  { // Если звонок окончен
+    GuardIntervalTime=millis();
+    SET_FLAG_NEED_ONE(MODEM_NEED_GET_TIME | MODEM_NEED_SEND_SMS);
+  }
+
+  if(READ_COM_FIND("+CSQ:")!=NULL)
+  {
+    if(READ_COM_FIND(NOT_SIGNAL)!=NULL) NotSignalCount++;
+    else NotSignalCount = 0;
+  }
+
+  if(READ_COM_FIND(NOT_READY)!=NULL || READ_COM_FIND("+XDRVI")!=NULL || READ_COM_FIND(MODEM_STARTUP)!=NULL)
+  {
+     SET_FLAG_NEED_ONE(MODEM_NEED_RESET); // будет перезагрузка
+  }
+
+  if(READ_COM_FIND("+PBREADY")!=NULL)
+  {
+    GuardIntervalTime=millis();
+    SET_FLAG_NEED_ONE(MODEM_NEED_DEL_ALL_SMS);
+  }
+
+  if(READ_COM_FIND("CONNECT")!=NULL)
+  {
+    // разорвать соединение
+    send_command(RING_BREAK, OK, 10000);
+    GuardIntervalTime=millis();
+    SET_FLAG_NEED_ZERO(MODEM_NEED_RING_BRAEK);
+  }
+/*
+  if(READ_COM_FIND("NO_ANSWER")!=NULL)
+  {
+
+  }
+*/
+
+#ifdef GPRS_ENABLE
+
+  if((p = READ_COM_FIND("+UDPSETUP"))!=NULL)
+  {
+    while(*p && *p!=':') p++;
+
+    if(*p)
+    {
+      p++;
+      if(*p = '0' || *p == '1') link->channel = *p;
+    }  
+  }
+
+#endif
+}
+
+#define ON_OFF_FLAG(flag,name) text->AddText(name);SET_FLAG_ZERO(NO_CARRIER);if(GET_FLAG(flag)){text->AddText("OFF");send_sms();SET_FLAG_ZERO(flag);}else{SET_FLAG_ONE(flag);text->AddText("ON");send_sms();}
+#define ON_OFF_FLAG_STATUS(flag,name) text->AddText(name);if(GET_FLAG(flag))text->AddText("ON");else text->AddText("OFF")
+
+void m590::wiring() // прослушиваем телефон
+{
+  byte tmp;
+
+  if(READ_COM()) parser();
+  else
+  {
+    // Проверяем, нет ли неотправленного или непрочитанного смс
+    if( millis() - timeSmsOpros > MODEM_SMS_OPROS_TIME)
+    {
+#ifdef EEPROM_ENABLE_FOR_SMS
+
+      DEBUG_PRINT(F("SMS OPROS = "));
+      DEBUG_PRINTLN(EEPROM_READ(EEPROM_SMS_ADDRESS));
+      if(EEPROM_READ(EEPROM_SMS_ADDRESS))
+#else
+      if(sms[0])
+#endif 
+      {
+        // если есть текст смс, вызываем функцию отправки смс
+        if(!send_command(MODEM_GET_STATUS, READY, 10000))
+        {
+          FAST_PRINTLN(text->GetText()); text->Clear();
+          send_sms();
+        }                    
+      }
+
+      // проверяем непрочитанные смс
+#ifdef M590_ENABLE
+      send_command(REC_UNREAD_SMS, "", 1000);
+#elif SIM800L_ENABLE
+      send_command("AT+CMGL=\"REC UNREAD\",1", "", 1000);
+#endif
+      timeSmsOpros = millis();
+    }
+
+    if(GET_FLAG_NEED(MODEM_NEED_DEL_ALL_SMS))
+    {
+      SET_FLAG_NEED_ZERO(MODEM_NEED_DEL_ALL_SMS);
+      send_command(DEL_ALL_READED_SENT_AND_NOTSENT_SMS, OK, 5000);
+    }
+  }
+
+  if(GET_FLAG_ERROR(MODEM_NOT_ANSWER) || GET_FLAG_NEED(MODEM_NEED_RESET) || (NotSignalCount > 5))
+  {
+    DEBUG_PRINT(F("MODEM_NOT_ANSWER=")); DEBUG_PRINTLN(GET_FLAG_ERROR(MODEM_NOT_ANSWER));
+    DEBUG_PRINT(F("MODEM_NEED_RESET=")); DEBUG_PRINTLN(GET_FLAG_NEED(MODEM_NEED_RESET));
+    DEBUG_PRINT(F("NotSignalCount="));   DEBUG_PRINTLN(NotSignalCount);
+
+    reinit();
+  }
+  else
+  {
+    if(GET_FLAG_NEED(MODEM_NEED_RING_BRAEK))
+    {      
+      send_command(RING_BREAK, OK, 10000); // разорвать соединение
+      GuardIntervalTime=millis();
+      SET_FLAG_NEED_ZERO(MODEM_NEED_RING_BRAEK);
+    }
+
+    if(GET_FLAG(GEO_DATA_OK))
+    {
+      SET_FLAG_ZERO(GEO_DATA_OK);
+      geo_loc->GetData(text->GetEndBuf());
+      text->Update();
+      send_sms();
+    }
+
+    if(GET_FLAG_NEED(MODEM_NEED_SEND_SMS))
+    {
+      SET_FLAG_NEED_ZERO(MODEM_NEED_SEND_SMS);
+      if(RingCount)
+      {
+        switch (RingCount)
+        {
+          case 2:
+            SET_FLAG_ZERO(NO_CARRIER | SMS_ENABLE);
+            break;
+          case 3:
+            ON_OFF_FLAG(SMS_ENABLE, "SMS_");
+            break;
+          case 4:
+            ON_OFF_FLAG(RING_ENABLE, "TEL_");        
+            break;
+#ifdef GEO_ENABLE
+          case 5:
+            /*
+              определяет параметры геолокации модуля (базовой станции).
+              Возвращает параметры LAC, CID.
+            */
+            send_command(F("AT+CREG=2"), OK, 1000);
+            GSMSERIAL.println(MODEM_NETWORK_REGISTRED);
+            SET_FLAG_ONE(SEND_GEO_DATA);
+            SET_FLAG_ONE(SMS_ENABLE);
+            break;
+          case 6:
+#else
+          case 5:
+#endif
+            FAST_PRINTLN(text->GetText());text->Clear();
+   
+            if(GET_FLAG(PENETRATION)) text->AddText("ALARM! ");
+
+            ON_OFF_FLAG_STATUS(SMS_ENABLE,"SMS_");
+            ON_OFF_FLAG_STATUS(RING_ENABLE," TEL_");
+
+            tmp = flags; // запоминаем текущее состояние флагов
+            SET_FLAG_ONE(SMS_ENABLE); // разрешаем отправку смс
+            SMS_SEND; // отправляем админу смс о состоянии флагов
+            flags = tmp; // возвращаем состояние флагов
+            break;
+          default:
+          {
+            //getTimeFromInternet();
+            SET_FLAG_ONE(NO_CARRIER);
+          }
+        }
+      }
+      RingCount = 0;
+    }
+    if(GET_FLAG_NEED(MODEM_NEED_GET_TIME))
+    {
+      SET_FLAG_NEED_ZERO(MODEM_NEED_GET_TIME);
+      send_command(GET_MODEM_TIME,OK, 1000);
+    } 
+  } 
+
+  // Проверяем, не завис ли модем
+  if( (millis() - timeRebutOpros > MODEM_REBUT_OPROS_TIME) || NotSignalCount)
+  {
+    GSMSERIAL.println(MODEM_GET_SIGNAL);
+    timeRebutOpros = millis();       
+  }    
+}
+
+// Без вызова reinit() во избежание рекурсии внутри reinit() и без разбора содержимого в parser()
+
+byte m590::simple_send_command(String command, char* answer, unsigned int wait_ms)
+{
+  byte ret = 0;
+  byte err   = -1;
+  byte count = 0;
+  unsigned long time;
+
+#ifndef DEBUG_MODE
+  PRINT(command.c_str());
+#endif
+
+  time = millis();
+
+  do
+  {
+    GSMSERIAL.println(command);
+    if(*answer == 0) return 0;
+
+    while(!(ret = READ_COM()) && (millis() - time < 1000));
+
+#ifndef MODEM_ENABLE
+    text->AddText(answer);
+#endif
+    if(!ret)  
+    {
+      err = MODEM_NOT_ANSWER;      
+      SERIAL_PRINTLN(F("NOT ANSWER"));
+    }
+    else
+    {
+      if (READ_COM_FIND(answer)!=NULL) return 0;
+      else if (READ_COM_FIND(ERR)!=NULL) err=MODEM_GET_ERROR;
+      else err=MODEM_GET_ANATHER_WORD;
+      DELAY(100);    
+    }     
+  } while(err && (err != MODEM_GET_ANATHER_WORD) && (millis() - time < wait_ms));
+
+  return err;
+}
+
+byte m590::send_command(String command, char* answer, unsigned int wait_ms)
+{
+  byte err = simple_send_command(command, answer, wait_ms);
+  parser();
+  if(err == MODEM_NOT_ANSWER) SET_FLAG_ERROR_ONE(MODEM_NOT_ANSWER);
+  return err;
+}
+
+void m590::ring()
+{
+  if(GET_FLAG(RING_ENABLE))
+  {
+    if(!send_command(MODEM_GET_STATUS, READY, 10000))
+    {
+      simple_send_command(RING_TO_ADMIN, OK, 10000);
+      GuardIntervalTime=millis();   
+    }
+  }
+}
+
+// выделяем дату и время из входящего смс
+bool m590::get_time_from_sms(char* str)
+{
+  char* p = text->GetText();
+  byte len = strlen(p);
+  byte i = 0, j;
+
+  i = len-1;
+  while(p[i]!='\"' && i) i--;
+  if(!i) return false;
+  j=i-1;
+  while(p[j]!='\"' && j) j--;
+  if(!j) return false;
+  memcpy(str,p+j,i-j+1);
+  str[i-j+1] = 0x00;
+  return true;
+}
+
+// выделяем дату и время из входящего смс
+void m590::set_time(String Time)
+{
+  send_command(String(SET_MODEM_TIME)+Time, OK, 1000);   
+}
+
+// записываем время и дату из часов модема в строку str
+bool m590::get_time(char* str)
+{
+  if(!send_command(GET_MODEM_TIME, OK, 1000))
+  {
+    return get_time_from_sms(str);
+  }
+  return false;
+}
+
+// функция timePrint переводит миллисекунды в понятный формат
+void m590::timePrint()
+{
+  byte tmp;
+  unsigned int t = millis()/1000;
+
+  tmp=t/3600;
+  if(tmp<10) text->AddChar('0'); 
+  text->AddInt(tmp); text->AddChar(':');
+  tmp=t/60%60;
+  if(tmp<10) text->AddChar('0');
+  text->AddInt(tmp); text->AddChar(':');
+  tmp=t%60;
+  if(tmp<10) text->AddChar('0');
+  text->AddInt(tmp);
+}
+
+
+
+/*
+ * Сравнение данных.
+ * Возвращает 1 если символ из первого массива больше символа из второго массива;
+ * Возвращает 2 если символ из первого массива больше символа из второго массива;
+ * Возвращает 0 если массивы эквивалентны.
+*/
+
+byte memcmp(byte *p1, byte *p2, byte size)
+{
+  for(byte i = 0; i < size; i++)
+  {
+    if(*p1 != *p2)
+    {
+      if(*p1 < *p2) return 1;
+      if(*p1 > *p2) return 2;      
+    }
+  }
+  return 0;  
+}
+
+#ifdef GPRS_ENABLE
+
+bool m590::GPRS_connect()
+{
+  byte count = 0;
+  unsigned int time;
+
+  // We start by connecting to a mobile GPRS network
+  SERIAL_PRINT(F("Connecting to Internet"));
+
+  if(send_command(F("AT+XISP=0"),OK,5000)) return false;  // включаем РРР
+  if(send_command(GPRS_NETWORK,OK,5000)) return false;  
+  if(send_command(GPRS_PASSWORD,OK,5000)) return false;   
+  if(send_command(F("AT+CUSD=1,\"*99#\""),OK,5000)) return false;  
+  if(send_command(F("AT+XIIC=1"),OK,5000)) return false;   
+    
+  // ждем IP
+  if(send_command(F("AT+XIIC?"), "0.0.0.0", 30000)) return false;        
+
+  if(!link_state)
+  {
+    if(link = new GPRS_LINK) link_state = true;
+  }
+
+  return true;      
+}
+
+bool m590::UDP_link_close()
+{
+  String cmd = "AT+UDPCLOSE=" + link->channel;
+
+  if(!send_command(cmd, OK, 5000))
+  {
+    delete link;
+    link_state = false;
+    return true;
+  }
+  else return false;
+}
+
+void m590::getTimeFromInternet()
+{
+  if(GPRS_connect())
+  {
+    if(send_command(UDPSETUP_TO_NTP_TIME_SERVER, OK, 10000)) return;
+    
+    String cmd = "AT+IPSTATUS=" + link->channel;
+
+    if(!send_command(cmd, "UDP", 5000))
+    {
+      send_command(F("at+udpsend=1,1"), OK, 5000);
+      UDP_link_close();
+    }    
+  }  
+}
+
+#endif
+
