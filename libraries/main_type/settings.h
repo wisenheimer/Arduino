@@ -77,7 +77,7 @@ enum pins
 	
 #define GAS_PIN 	A0 // датчик газа (аналоговый вход)
 
-#define SENS_COUNT  6
+#define SENS_COUNT  6 // количество датчиков, указанных в файле my_sensors.h при инициализации Sensor sensors[SENS_COUNT]
 #define RESET_COUNT 3 // Сколько раз модем может не ответить до перезагрузки
 
 /*
