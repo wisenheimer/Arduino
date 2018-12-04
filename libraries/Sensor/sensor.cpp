@@ -24,6 +24,15 @@ Sensor::Sensor(uint8_t dpin, uint8_t dtype, uint8_t start_time_sec = 10)
   }
 }
 
+/*
+    dpin - цифровой пин ардуино
+    dtype - тип датчика. Типы татчиков перечислены в "sensor.h"
+    pinLevel - уровен на цифровом пине датчика в спокойном режиме (LOW или  HIGHT)
+    pin_init_state - уровень на соответствующем пине ардуины (LOW или  HIGHT)
+    start_time_sec = 10 - время на подготовку датчика при старте,
+                          когда к нему нельзя обращаться,
+                          чтобы не получить ложные данные
+*/
 Sensor::Sensor(uint8_t dpin, uint8_t dtype, uint8_t pinLevel, uint8_t pin_init_state, uint8_t start_time_sec = 10)
 {
   pin = dpin;
