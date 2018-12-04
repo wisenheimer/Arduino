@@ -1,29 +1,11 @@
 #include "sensor.h"
-// Условия для рестарта модема
-/*
-#define ADD_NAME(name) const char name_##name[] PROGMEM="SENS"
-#define SENS_TYPES(n1,n2,n3,n4,n5) \
-    enum {n1,n2,n3,n4,n5}; \
-    ADD_NAME(n1);\
-    ADD_NAME(n2);\
-    ADD_NAME(n3);\
-    ADD_NAME(n4);\
-    ADD_NAME(n5);\
-    const char* const name[] PROGMEM = { name_##n1, name_##n2, name_##n3, name_##n4, name_##n5};                                
-// типы датчиков
-SENS_TYPES(DOOR,MOVE,RADAR,GAS,FIRE);
-*/
-/*
-#define ADD_NAME(index,name) const char name_##index[] PROGMEM=name
 
-ADD_NAME(0,"DOOR");
-ADD_NAME(1,"MOVE");
-ADD_NAME(2,"RADAR");
-ADD_NAME(3,"GAS");
-ADD_NAME(4,"FIRE");
-ADD_NAME(5,"DHT11");
-
-const char* const name[] PROGMEM = {name_0, name_1, name_2, name_3, name_4, name_5};
+/*
+    dpin - цифровой пин ардуино
+    dtype - тип датчика. Типы татчиков перечислены в "sensor.h"
+    start_time_sec = 10 - время на подготовку датчика при старте,
+                          когда к нему нельзя обращаться,
+                          чтобы не получить ложные данные
 */
 Sensor::Sensor(uint8_t dpin, uint8_t dtype, uint8_t start_time_sec = 10)
 {
@@ -119,10 +101,13 @@ bool Sensor::analog_sensor_check()
 
   value = get_data();
 
+  // если показание аналогового датчика превысило пороговое значение
   if(value >= step)
   {
+    // увеличиваем это пороговое значение
     if(type == DHT) step=value + 5;
     else step=value + 200;
+    // увеличиваем счётчик срабатываний на 1
     count++;
     res = true;
   }
@@ -130,6 +115,7 @@ bool Sensor::analog_sensor_check()
   if(type == DHT) alarm_value = DHT_SIGN_ALARM_VALUE;
   else alarm_value = ANALOG_SIGN_ALARM_VALUE;
 
+  // сброс порогового значения до значения по умолчанию
   if(value < alarm_value)
   {
     if(step>alarm_value)
@@ -148,7 +134,7 @@ void Sensor::get_name_for_type(TEXT *str)
   str->AddChar(' ');
   //str->AddChar(ch[type]);
   switch (type)
-  {
+  { // Добавляем название датчика
     case DOOR:  str->AddText_P(PSTR("DOOR"));  break;
     case MOVE:  str->AddText_P(PSTR("MOVE"));  break;
     case RADAR: str->AddText_P(PSTR("RADAR")); break;
@@ -176,8 +162,10 @@ void Sensor::get_info(TEXT *str)
       break;
     default:
       bool val = get_pin_state();
+      // добавляем число срабатываний датчика
       str->AddInt(count);
       str->AddChar('(');
+      // добавляем текущее состояние пина (0 или 1)
       str->AddInt(val);
       str->AddChar(')');
   }
