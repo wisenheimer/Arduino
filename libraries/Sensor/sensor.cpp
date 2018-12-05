@@ -3,41 +3,19 @@
 /*
     dpin - цифровой пин ардуино
     dtype - тип датчика. Типы татчиков перечислены в "sensor.h"
-    start_time_sec = 10 - время на подготовку датчика при старте,
-                          когда к нему нельзя обращаться,
-                          чтобы не получить ложные данные
-*/
-Sensor::Sensor(uint8_t dpin, uint8_t dtype, uint8_t start_time_sec = 10)
-{
-  pin = dpin;
-  type = dtype;
-  start_time = start_time_sec;
-  end_time   = start_time_sec;
-
-  if(type == DHT)
-  {
-#ifdef SENSOR_DHT_ENABLE
-  // Инициализируем датчик температуры и влажности
-    dht = new dht11(pin);
-    step = DHT_SIGN_ALARM_VALUE; // шаг показаний
-#endif
-  }
-}
-
-/*
-    dpin - цифровой пин ардуино
-    dtype - тип датчика. Типы татчиков перечислены в "sensor.h"
+    sens_name - имя датчика
     pinLevel - уровен на цифровом пине датчика в спокойном режиме (LOW или  HIGHT)
     pin_init_state - уровень на соответствующем пине ардуины (LOW или  HIGHT)
     start_time_sec = 10 - время на подготовку датчика при старте,
                           когда к нему нельзя обращаться,
                           чтобы не получить ложные данные
 */
-Sensor::Sensor(uint8_t dpin, uint8_t dtype, uint8_t pinLevel, uint8_t pin_init_state, uint8_t start_time_sec = 10)
+Sensor::Sensor(uint8_t dpin, uint8_t dtype, char* sens_name, uint8_t pinLevel = LOW, uint8_t pin_init_state = LOW, uint8_t start_time_sec = 10)
 {
   pin = dpin;
-  data_pin = dpin;
   type = dtype;
+  name = (char*)calloc(1,strlen(sens_name)+1);
+  strcpy(name, sens_name);
 
   start_time = start_time_sec;
   end_time   = start_time_sec;
@@ -46,7 +24,7 @@ Sensor::Sensor(uint8_t dpin, uint8_t dtype, uint8_t pinLevel, uint8_t pin_init_s
   if(type == DHT)
   {
     // Инициализируем датчик температуры и влажности
-    dht = new dht11(DHT_PIN);
+    dht = new dht11(pin);
     step = DHT_SIGN_ALARM_VALUE; // шаг показаний
     return;
   }
@@ -68,6 +46,7 @@ Sensor::~Sensor()
     delete dht;
   }
 #endif
+  free(name);
 }
 
 bool Sensor::get_pin_state()
@@ -92,7 +71,7 @@ uint16_t Sensor::get_data()
 #ifdef SENSOR_DHT_ENABLE
   if(type==DHT) return dht->GetData();
 #endif
-  return analogRead(data_pin);
+  return analogRead(pin);
 }
 
 uint8_t Sensor::get_count()  
@@ -137,27 +116,10 @@ bool Sensor::analog_sensor_check()
 }
 
 // Записываем в строку показания датчика
-void Sensor::get_name_for_type(TEXT *str)
-{
-//  char ch[]={'D','M','R','G','F','H'};
-  str->AddChar(' ');
-  //str->AddChar(ch[type]);
-  switch (type)
-  { // Добавляем название датчика
-    case DOOR:  str->AddText_P(PSTR("DOOR"));  break;
-    case MOVE:  str->AddText_P(PSTR("MOVE"));  break;
-    case RADAR: str->AddText_P(PSTR("RADAR")); break;
-    case GAS:   str->AddText_P(PSTR("GAS"));   break;
-    case FIRE:  str->AddText_P(PSTR("FIRE"));  break;
-    case DHT:   str->AddText_P(PSTR("DHT")); break;
-  }
-  str->AddChar(':');
-}
-
-// Записываем в строку показания датчика
 void Sensor::get_info(TEXT *str)
 {
-  get_name_for_type(str);
+  str->AddText(name);
+  str->AddChar(':');
 
   switch (type)
   {
@@ -166,8 +128,8 @@ void Sensor::get_info(TEXT *str)
       dht->getInfo(str);      
       break;
 #endif
-    case GAS:
-      str->AddInt(analogRead(data_pin));
+    case ANALOG_SENSOR:
+      str->AddInt(analogRead(pin));
       break;
     default:
       bool val = get_pin_state();

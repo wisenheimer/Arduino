@@ -27,7 +27,7 @@ void MY_SENS::GetInfo(TEXT *buf)
   for(uint8_t i=0;i<size;i++)
   {
     // Выводим только сработавшие датчики
-    if(sensors[i].count || sensors[i].type==DHT || sensors[i].type==GAS)
+    if(sensors[i].count || sensors[i].type==DHT || sensors[i].type==ANALOG_SENSOR)
     {
       sensors[i].get_info(buf);
     }
@@ -116,15 +116,13 @@ uint8_t MY_SENS::SensOpros()
     {
       switch (sensors[i].type)
       {
-        case DOOR:
-        case MOVE:
-        case RADAR:
+        case DIGITAL_SENSOR:
           count += sensors[i].get_count();
           break;
-        case FIRE:
+        case CHECK_DIGITAL_SENSOR:
           count += check_sens_fire(i);
           break;
-        case GAS:
+        case ANALOG_SENSOR:
         case DHT:
           count += sensors[i].analog_sensor_check();
       }      

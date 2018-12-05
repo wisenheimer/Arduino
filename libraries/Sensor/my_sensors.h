@@ -29,29 +29,8 @@ class MY_SENS
 
   private:
   	// Инициализация датчиков
-
-	Sensor sensors[SENS_COUNT] =
-	{
-		Sensor(DOOR_PIN,DOOR,HIGH,HIGH,0)
-#ifdef SENSOR_RADAR_ENABLE
-        ,Sensor(RADAR_PIN,RADAR,LOW,LOW)
-#endif
-#ifdef SENSOR_MOVE_ENABLE
-        ,Sensor(MOVE_PIN,MOVE,LOW,LOW)
-#endif
-#ifdef SENSOR_FIRE_ENABLE
-        ,Sensor(FIRE_PIN,FIRE,HIGH,LOW)
-#endif
-// Инициализируем цифровые датчики с аналоговым выходoм.
-// Для экономии пинов ардуино цифровой пин не используем
-#ifdef SENSOR_GAS_ENABLE    
-        ,Sensor(GAS_PIN,GAS,LOW,LOW,120)
-#endif
-#ifdef SENSOR_DHT_ENABLE
-        ,Sensor(DHT_PIN,DHT)
-#endif
-    };
-
+	SENSORS_INIT
+    
     uint8_t check_sens_fire(uint8_t sens_index);
 };
 
