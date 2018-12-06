@@ -40,7 +40,7 @@ class MODEM
   public:
     uint8_t time_last_answer; // время последнего ответа модема
 
-    MODEM();
+    MODEM::MODEM(uint8_t *sens_enable_flag);
     ~MODEM();
     TEXT *email_buffer;
     
