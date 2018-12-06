@@ -10,7 +10,7 @@
                           когда к нему нельзя обращаться,
                           чтобы не получить ложные данные
 */
-Sensor::Sensor(uint8_t dpin, uint8_t dtype, char* sens_name, uint8_t pinLevel = LOW, uint8_t pin_init_state = LOW, uint8_t start_time_sec = 10)
+Sensor::Sensor(uint8_t dpin, uint8_t dtype, char* sens_name, uint8_t pinLevel = LOW, uint8_t start_time_sec = 10)
 {
   pin = dpin;
   type = dtype;
@@ -30,7 +30,7 @@ Sensor::Sensor(uint8_t dpin, uint8_t dtype, char* sens_name, uint8_t pinLevel = 
   }
 #endif
   pinMode(pin, INPUT); // устанавливаем пин в качестве входа для считывания показаний
-  digitalWrite(pin, pin_init_state);
+  digitalWrite(pin, LOW);
   level = pinLevel;
   prev_pin_state = level;
   count = 0;
