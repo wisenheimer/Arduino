@@ -646,7 +646,7 @@ void MODEM::wiring() // прослушиваем телефон
         if(DTMF[1]%10)
         bitSet(*sens_flag,DTMF[1]/10); //21/10=2
         else bitClear(*sens_flag,DTMF[1]/10); //20/10=2        
-        email_buffer->AddText_P(PSTR("flag="));
+        email_buffer->AddText_P(PSTR("\n edited flag="));
         email_buffer->AddInt(*sens_flag);          
         break;
       case EMAIL_ADMIN_PHONE: // получение номера админа на email
