@@ -11,8 +11,8 @@
 */
 Sensor::Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = LOW, uint8_t start_time_sec = 10)
 {
-  pin = dpin;
-  type = dtype;
+  pin = _pin;
+  type = _type;
   name = (char*)calloc(1,strlen(sens_name)+1);
   strcpy(name, sens_name);
 
