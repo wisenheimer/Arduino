@@ -33,7 +33,7 @@ class Sensor   // название класса
     bool level;    // высокий или низкий уровень пина
    
     // только цифровой пин
-    Sensor(uint8_t dpin, uint8_t dtype, char* sens_name, uint8_t pinLevel = LOW, uint8_t pin_init_state = LOW, uint8_t start_time_sec = 10);
+    Sensor(uint8_t dpin, uint8_t dtype, char* sens_name, uint8_t pinLevel = LOW, uint8_t start_time_sec = 10);
     ~Sensor();
     
     uint16_t get_data();        // возвращает analogRead(pin)
