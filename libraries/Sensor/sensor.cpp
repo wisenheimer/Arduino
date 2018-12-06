@@ -131,12 +131,12 @@ void Sensor::get_info(TEXT *str)
       str->AddInt(analogRead(pin));
       break;
     default:
-      bool val = get_pin_state();
+      char val = get_pin_state() + 48;
       // добавляем число срабатываний датчика
       str->AddInt(count);
       str->AddChar('(');
       // добавляем текущее состояние пина (0 или 1)
-      str->AddInt(val);
+      str->AddChar(val);
       str->AddChar(')');
   }
 }
