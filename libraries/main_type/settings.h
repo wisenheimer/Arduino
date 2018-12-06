@@ -72,31 +72,30 @@ enum pins
 	Если у вас другой датчик (не из списка), опишите его аналогично, и добавьте в SENSORS_INIT
 
     Номер параметра и значение
-    1 - цифровой пин ардуино
-    2 - тип датчика. Типы татчиков перечислены в "sensor.h"
-    3 - название датчика (имя)
+    1 - пин ардуино
+    2 - тип датчика. Типы датчиков перечислены в "sensor.h"
+    3 - уникальное имя датчика. Будет выводиться в отчётах.
     4 - уровен на цифровом пине датчика в спокойном режиме (LOW или  HIGHT)
-    5 - уровень на соответствующем пине ардуины при инициализации (LOW или  HIGHT)
-    6 - время на подготовку датчика при старте в секундах,
+    5 - время на подготовку датчика при старте в секундах,
     	когда к нему нельзя обращаться, чтобы не получить ложные данные.
     	Если не указать, то он будет равен 10 сек.
 */
-#define DOOR_INIT 		Sensor(DOOR_PIN, DIGITAL_SENSOR, "DOOR", HIGH,	HIGH, 0)
+#define DOOR_INIT 		Sensor(DOOR_PIN, DIGITAL_SENSOR, "DOOR", HIGH, 0)
 
 #ifdef SENSOR_RADAR_ENABLE
-	#define RADAR_INIT 	,Sensor(RADAR_PIN, DIGITAL_SENSOR, "RADAR", LOW, LOW)
+	#define RADAR_INIT 	,Sensor(RADAR_PIN, DIGITAL_SENSOR, "RADAR", LOW)
 #else 
 	#define RADAR_INIT
 #endif
 
 #ifdef SENSOR_MOVE_ENABLE
-	#define MOVE_INIT 	,Sensor(MOVE_PIN, DIGITAL_SENSOR, "MOVE", LOW, LOW)
+	#define MOVE_INIT 	,Sensor(MOVE_PIN, DIGITAL_SENSOR, "MOVE", LOW)
 #else
 	#define MOVE_INIT
 #endif
 
 #ifdef SENSOR_FIRE_ENABLE
-	#define FIRE_INIT 	,Sensor(FIRE_PIN, CHECK_DIGITAL_SENSOR, "FIRE", HIGH, LOW)
+	#define FIRE_INIT 	,Sensor(FIRE_PIN, CHECK_DIGITAL_SENSOR, "FIRE", HIGH)
 #else
 	#define FIRE_INIT
 #endif
@@ -104,7 +103,7 @@ enum pins
 // Инициализируем цифровые датчики с аналоговым выходoм.
 // Для экономии пинов ардуино цифровой пин не используем
 #ifdef SENSOR_GAS_ENABLE    
-	#define GAS_INIT 	,Sensor(A0, ANALOG_SENSOR, "GAS", LOW, LOW, 120)
+	#define GAS_INIT 	,Sensor(A0, ANALOG_SENSOR, "GAS", LOW, 120)
 #else
 	#define GAS_INIT
 #endif
