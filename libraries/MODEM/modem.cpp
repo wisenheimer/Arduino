@@ -170,10 +170,11 @@ void MODEM::send_message()
   }   
 }
 
-MODEM::MODEM()
+MODEM::MODEM(uint8_t *sens_enable_flag)
 {
   op_count = sizeof(op_base)/sizeof(OPERATORS);
   gsm_operator = op_count;
+  sens_flag = sens_enable_flag;
   // зуммер
   BEEP_INIT;
   // Устанавливаем скорость связи Ардуино и модема
