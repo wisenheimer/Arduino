@@ -60,7 +60,7 @@ void setup()
 
   sensors = new MY_SENS();
 
-  phone = new MODEM();
+  phone = new MODEM(sensors->flag_enable);
 
   phone->init();
 
