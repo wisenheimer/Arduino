@@ -78,7 +78,7 @@ void MY_SENS::RestoreEnable()
 	flag_enable = tmp;
 }
 
-uint8_t MY_SENS::check_sens_fire(uint8_t sens_index)
+uint8_t MY_SENS::get_check_count(uint8_t sens_index)
 {      
   uint8_t count = sensors[sens_index].count;
 
@@ -120,7 +120,7 @@ uint8_t MY_SENS::SensOpros()
           count += sensors[i].get_count();
           break;
         case CHECK_DIGITAL_SENSOR:
-          count += check_sens_fire(i);
+          count += get_check_count(i);
           break;
         case ANALOG_SENSOR:
         case DHT:
