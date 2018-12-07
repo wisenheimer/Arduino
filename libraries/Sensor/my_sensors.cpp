@@ -124,7 +124,7 @@ uint8_t MY_SENS::SensOpros()
           break;
         case ANALOG_SENSOR:
         case DHT:
-          count += sensors[i].analog_sensor_check();
+          count += sensors[i].get_analog_count();
       }      
     }
   }
