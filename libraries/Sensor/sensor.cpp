@@ -81,7 +81,7 @@ uint8_t Sensor::get_count()
   return count;
 }
 
-bool Sensor::analog_sensor_check()
+bool Sensor::get_analog_count()
 {
   if(count) return true;
     // если показание аналогового датчика превысило пороговое значение
