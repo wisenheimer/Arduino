@@ -4,12 +4,13 @@
     _pin - пин ардуино
     _type - типы датчиков перечислены в "sensor.h"
     sens_name - имя датчика
-    pinLevel - уровень на пине датчика в спокойном режиме (LOW или  HIGHT)
+    pinLevel - уровень на пине датчика в спокойном режиме (LOW или HIGHT)
     start_time_sec = 10 - время на подготовку датчика при старте,
                           когда к нему нельзя обращаться,
                           чтобы не получить ложные данные
+    alarm_val = ANALOG_SIGN_ALARM_VALUE - значение срабатывания аналогового датчика
 */
-Sensor::Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = LOW, uint8_t start_time_sec = 10)
+Sensor::Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = LOW, uint8_t start_time_sec = 10, uint8_t alarm_val = ANALOG_SIGN_ALARM_VALUE)
 {
   pin = _pin;
   type = _type;
@@ -18,13 +19,14 @@ Sensor::Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = 
 
   start_time = start_time_sec;
   end_time   = start_time_sec;
+    
+  alarm_value = alarm_val;
 
 #ifdef SENSOR_DHT_ENABLE
   if(type == DHT)
   {
     // Инициализируем датчик температуры и влажности
     dht = new dht11(pin);
-    step = DHT_SIGN_ALARM_VALUE; // шаг показаний
     return;
   }
 #endif
@@ -32,8 +34,7 @@ Sensor::Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = 
   digitalWrite(pin, LOW);
   level = pinLevel;
   prev_pin_state = level;
-  count = 0;
-  step = ANALOG_SIGN_ALARM_VALUE; // шаг показаний
+  count = 0; 
 }
 
 Sensor::~Sensor()
@@ -82,36 +83,14 @@ uint8_t Sensor::get_count()
 
 bool Sensor::analog_sensor_check()
 {
-  bool res = false;
-  uint8_t alarm_value; 
-  uint16_t value;
-
-  value = get_data();
-
   // если показание аналогового датчика превысило пороговое значение
-  if(value >= step)
+  if(get_data() >= step)
   {
-    // увеличиваем это пороговое значение
-    if(type == DHT) step=value + 5;
-    else step=value + 200;
     // увеличиваем счётчик срабатываний на 1
     count++;
-    res = true;
+    return true;
   }
-
-  if(type == DHT) alarm_value = DHT_SIGN_ALARM_VALUE;
-  else alarm_value = ANALOG_SIGN_ALARM_VALUE;
-
-  // сброс порогового значения до значения по умолчанию
-  if(value < alarm_value)
-  {
-    if(step>alarm_value)
-    {
-      step=alarm_value;        
-    }      
-  }
-
-  return res;
+  return false;
 }
 
 // Записываем в строку показания датчика
