@@ -84,7 +84,7 @@ uint8_t Sensor::get_count()
 bool Sensor::analog_sensor_check()
 {
   // если показание аналогового датчика превысило пороговое значение
-  if(get_data() >= step)
+  if(get_data() >= alarm_value)
   {
     // увеличиваем счётчик срабатываний на 1
     count++;
