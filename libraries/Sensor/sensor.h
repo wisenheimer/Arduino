@@ -32,8 +32,7 @@ class Sensor   // название класса
     uint8_t pin;   // пин
     bool level;    // высокий или низкий уровень пина
    
-    // только цифровой пин
-    Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = LOW, uint8_t start_time_sec = 10);
+    Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = LOW, uint8_t start_time_sec = 10, uint8_t alarm_val = ANALOG_SIGN_ALARM_VALUE);
     ~Sensor();
     
     uint16_t get_data();        // возвращает analogRead(pin)
@@ -44,8 +43,7 @@ class Sensor   // название класса
     bool analog_sensor_check();
     
   private:
-  
-    uint8_t step;           // шаг показаний для аналоговых датчиков
+    uint8_t alarm_value;    // значение срабатывания аналогового датчика
     bool prev_pin_state;    // предыдущее состояние пина
     const char *name;
 #ifdef SENSOR_DHT_ENABLE
