@@ -31,7 +31,7 @@ class MY_SENS
   	// Инициализация датчиков
 	SENSORS_INIT
     
-    uint8_t check_sens_fire(uint8_t sens_index);
+    uint8_t get_check_count(uint8_t sens_index);
 };
 
 #endif // MY_SENS_H
