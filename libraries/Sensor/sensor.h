@@ -38,9 +38,9 @@ class Sensor   // название класса
     uint16_t get_data();        // возвращает analogRead(pin)
     bool get_pin_state();       // возвращает state = digitalRead(pin). Если состояние изменилось, увеличивет счётчик срабатываний на 1.
     uint8_t get_count();        // возвращает счётчик срабатываний датчика.
+    bool get_analog_count();
     void get_info(TEXT *str);   // возвращает строку с именем датчика и числом срабатываний
-    void get_name_for_type(TEXT *str);
-    bool analog_sensor_check();
+    void get_name_for_type(TEXT *str);    
     
   private:
     uint8_t alarm_value;    // значение срабатывания аналогового датчика
