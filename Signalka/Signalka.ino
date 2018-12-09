@@ -11,10 +11,10 @@ MODEM *phone;
 
 MY_SENS *sensors = NULL;
 
-// активируем флаг тревоги для сбора информации и отправки смс
+// активируем флаг тревоги для сбора информации и отправки e-mail
 #define ALARM_ON  if(!GET_FLAG(ALARM)){sensors->SaveEnableTmp();SET_FLAG_ONE(ALARM);AlarmTime=ALARM_MAX_TIME;phone->ring_to_admin(); \
                   phone->email_buffer->AddText_P(PSTR(" ALARM!"));sensors->GetInfo(phone->email_buffer);}
-// дезактивируем флаг тревоги, если в течении заданного времени никаких действий не происходило
+// по окончании времени ALARM_MAX_TIME обнуляем флаг тревоги и отправляем e-mail с показаниями датчиков
 #define ALARM_OFF {SET_FLAG_ZERO(ALARM);sensors->RestoreEnable();phone->email_buffer->AddText_P(PSTR(" ALL:"));sensors->GetInfo(phone->email_buffer);sensors->Clear();}
 
 // Переменные, создаваемые процессом сборки,
@@ -49,8 +49,7 @@ void power()
 
 void setup()
 {
-  // Инициализируем цифровые датчики
-  pinMode(POWER_PIN, INPUT); // устанавливаем пин в качестве входа для считывания показаний
+  pinMode(POWER_PIN, INPUT);
   digitalWrite(POWER_PIN, LOW);
   pinMode(BOOT_PIN, OUTPUT);
   digitalWrite(BOOT_PIN, LOW);
@@ -59,6 +58,10 @@ void setup()
   attachInterrupt(1, power, CHANGE);
 
   sensors = new MY_SENS();
+  
+  // Подтянем пин к 5 вольтам, чтобы датчик двери мог сработать
+  // при отключении внешнего питания
+  pinMode(DOOR_PIN, INPUT_PULLUP);
 
   phone = new MODEM(sensors->flag_enable);
 
@@ -92,7 +95,7 @@ void timer(uint16_t time)
       if(AlarmTime) AlarmTime--;
       else // По истечении заданного времени ALARM_MAX_TIME 
       {
-        ALARM_OFF; // Выключаем режим тревоги и отправляем e-mail с показаниями датчиков. Очищаем статистику датчиков.            
+        ALARM_OFF; // Выключаем режим тревоги и отправляем e-mail. Очищаем статистику датчиков.            
       }
     }        
   }
