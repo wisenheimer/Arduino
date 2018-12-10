@@ -21,21 +21,20 @@ Sensor::Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = 
   end_time   = start_time_sec;
     
   alarm_value = alarm_val;
+  count = 0;
 
 #ifdef SENSOR_DHT_ENABLE
   if(type == DHT11 || type == DHT21 || type == DHT22)
   {
     // Инициализируем датчик температуры и влажности
     dht = new DHT(type);
-    step = DHT_SIGN_ALARM_VALUE; // шаг показаний
     return;
   }
 #endif
   pinMode(pin, INPUT); // устанавливаем пин в качестве входа для считывания показаний
   digitalWrite(pin, LOW);
   level = pinLevel;
-  prev_pin_state = level;
-  count = 0; 
+  prev_pin_state = level;   
 }
 
 Sensor::~Sensor()
