@@ -12,19 +12,7 @@ MODEM	KEYWORD1
 # Methods and Functions (KEYWORD2)
 ###########################################
 
-GuardIntervalTime KEYWORD2
-timeRebutOpros KEYWORD2
-init KEYWORD2 
-reinit KEYWORD2
-parser KEYWORD2
+init KEYWORD2
 wiring KEYWORD2
-send_command KEYWORD2
-ring KEYWORD2
-send_sms KEYWORD2
-get_time_from_sms KEYWORD2
-set_time KEYWORD2
-get_time KEYWORD2
-timePrint KEYWORD2
-GPRS_connect KEYWORD2
-read_com KEYWORD2
-
+ring_to_admin KEYWORD2
+email KEYWORD2
