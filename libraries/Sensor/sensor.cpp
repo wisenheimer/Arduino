@@ -23,10 +23,11 @@ Sensor::Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = 
   alarm_value = alarm_val;
 
 #ifdef SENSOR_DHT_ENABLE
-  if(type == DHT)
+  if(type == DHT11 || type == DHT21 || type == DHT22)
   {
     // Инициализируем датчик температуры и влажности
-    dht = new dht11(pin);
+    dht = new DHT(type);
+    step = DHT_SIGN_ALARM_VALUE; // шаг показаний
     return;
   }
 #endif
@@ -40,7 +41,7 @@ Sensor::Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = 
 Sensor::~Sensor()
 {
 #ifdef SENSOR_DHT_ENABLE
-  if(type == DHT)
+  if(type == DHT11 || type == DHT21 || type == DHT22)
   {
   // Инициализируем датчик температуры и влажности
     delete dht;
@@ -69,7 +70,7 @@ bool Sensor::get_pin_state()
 uint16_t Sensor::get_data()
 {
 #ifdef SENSOR_DHT_ENABLE
-  if(type==DHT) return dht->GetData();
+  if(type == DHT11 || type == DHT21 || type == DHT22) return dht->readTemperature(pin);
 #endif
   return analogRead(pin);
 }
@@ -103,8 +104,14 @@ void Sensor::get_info(TEXT *str)
   switch (type)
   {
 #ifdef SENSOR_DHT_ENABLE
-    case DHT:
-      dht->getInfo(str);      
+    case DHT11:
+    case DHT21:
+    case DHT22:
+      str->AddText_P(PSTR("t="));
+      str->AddInt(dht->readTemperature(pin));
+      str->AddText_P(PSTR("*C,h="));
+      str->AddInt(dht->readHumidity(pin));
+      str->AddChar('%');     
       break;
 #endif
     case ANALOG_SENSOR:
