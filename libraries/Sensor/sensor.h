@@ -7,7 +7,7 @@
 
 #ifdef SENSOR_DHT_ENABLE
 
-  #include <DHT_11.h>
+  #include "stDHT.h" // https://istarik.ru/blog/arduino/35.html
 
 #endif
 
@@ -15,8 +15,8 @@
 enum {
         DIGITAL_SENSOR,// датчик с одним цифровым выходом
         CHECK_DIGITAL_SENSOR,   // датчик с одним цифровым выходом, с проверкой от ложного срабатывания 10 сек
-        ANALOG_SENSOR,  // датчик с аналоговым выходом
-        DHT,            // датчик температуры DHT11 или DHT22
+        ANALOG_SENSOR  // датчик с аналоговым выходом
+//      ,DHT11,DHT21,DHT22       // датчики температуры и влажности DHT11, DHT21 или DHT22, объявлены в stDHT.h
 };
 
 class Sensor   // название класса
@@ -47,7 +47,7 @@ class Sensor   // название класса
     bool prev_pin_state;    // предыдущее состояние пина
     const char *name;
 #ifdef SENSOR_DHT_ENABLE
-    dht11* dht; // датчик температуры и влажности   
+    DHT* dht; // датчик температуры и влажности   
 #endif
 };
 
