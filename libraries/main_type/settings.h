@@ -140,4 +140,6 @@ enum pins
 #define ANALOG_SIGN_ALARM_VALUE 	200 // значение для срабатывания аналогового датчика
 #define ALARM_MAX_TIME				60	// продолжительность тревоги sec, после чего счётчики срабатываний обнуляются
 
+#define ANALOG_OPROS_TIME			10	// частота опроса аналоговых датчиков, в секундах
+
 #endif // SETTINGS_H
