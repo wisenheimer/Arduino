@@ -14,7 +14,6 @@ MY_SENS::MY_SENS()
 	// flag_enable=0b11111001; Тогда при срабатывании геркона мы можем учитывать показания датчиков движения,
 	// как подтверждение, что на объекте кто-то есть.
 	flag_enable=0b11111111;
-  analog_opros_time = ANALOG_OPROS_TIME;
 }
 
 MY_SENS::~MY_SENS()
@@ -124,12 +123,8 @@ uint8_t MY_SENS::SensOpros()
           count += get_check_count(i);
           break;
         default:
-          if(!analog_opros_time)
-          {
-            count += sensors[i].get_analog_count();
-            analog_opros_time = ANALOG_OPROS_TIME;
-          }
-          else analog_opros_time--;          
+          count += sensors[i].get_analog_count();
+          sensors[i].start_time = ANALOG_OPROS_TIME;       
       }      
     }
   }

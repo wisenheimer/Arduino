@@ -40,7 +40,7 @@ class Sensor   // название класса
     uint8_t get_count();        // возвращает счётчик срабатываний датчика.
     bool get_analog_count();
     void get_info(TEXT *str);   // возвращает строку с именем датчика и числом срабатываний
-    void get_name_for_type(TEXT *str);    
+    void get_name_for_type(TEXT *str);  
     
   private:
     uint8_t alarm_value;    // значение срабатывания аналогового датчика

@@ -9,7 +9,7 @@
 class MY_SENS
 {
   public:
-    uint8_t flag_enable, tmp, analog_opros_time;
+    uint8_t flag_enable, tmp;
 
     MY_SENS();
     ~MY_SENS();

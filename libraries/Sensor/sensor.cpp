@@ -57,9 +57,9 @@ bool Sensor::get_pin_state()
 
   if(level)
   {
-      if(!state && prev_pin_state) count++;
+    if(!state && prev_pin_state) count++;
   }
-  else if(state && !prev_pin_state) count++;		
+  else if(state && !prev_pin_state) count++;    
 
   prev_pin_state = state;
   
@@ -83,14 +83,14 @@ uint8_t Sensor::get_count()
 
 bool Sensor::get_analog_count()
 {
-  if(count) return true;
-    // если показание аналогового датчика превысило пороговое значение
+  // если показание аналогового датчика превысило пороговое значение
   if(get_data() >= alarm_value)
   {
     // увеличиваем счётчик срабатываний на 1
     count++;
     return true;
-  }
+  }    
+ 
   return false;
 }
 
@@ -117,7 +117,7 @@ void Sensor::get_info(TEXT *str)
       str->AddInt(analogRead(pin));
       break;
     default:
-      char val = get_pin_state() + 48;
+      char val = get_pin_state() + '0';
       // добавляем число срабатываний датчика
       str->AddInt(count);
       str->AddChar('(');
