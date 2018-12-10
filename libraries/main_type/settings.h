@@ -60,7 +60,7 @@ enum pins
 #endif
 
 #ifdef SENSOR_DHT_ENABLE
-		DHT_PIN,   		//8 датчик температуры и влажности DHT11
+		DHT_PIN,   		//8 датчик температуры и влажности DHT11, DHT21 или DHT22
 #endif
 
 #ifdef BEEP_ENABLE
@@ -113,7 +113,7 @@ enum pins
 #endif
 
 #ifdef SENSOR_DHT_ENABLE
-	#define DHT_INIT 	,Sensor(DHT_PIN, DHT, "DHT", LOW, 10, 35)
+	#define DHT_INIT 	,Sensor(DHT_PIN, DHT11, "DHT", LOW, 10, 35)
 #else
 	#define DHT_INIT
 #endif
