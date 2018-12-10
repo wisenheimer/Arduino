@@ -27,7 +27,7 @@ void MY_SENS::GetInfo(TEXT *buf)
   for(uint8_t i=0;i<size;i++)
   {
     // Выводим только сработавшие датчики
-    if(sensors[i].count || sensors[i].type==DHT || sensors[i].type==ANALOG_SENSOR)
+    if(sensors[i].count)
     {
       sensors[i].get_info(buf);
     }
@@ -122,8 +122,7 @@ uint8_t MY_SENS::SensOpros()
         case CHECK_DIGITAL_SENSOR:
           count += get_check_count(i);
           break;
-        case ANALOG_SENSOR:
-        case DHT:
+        default:
           count += sensors[i].get_analog_count();
       }      
     }
