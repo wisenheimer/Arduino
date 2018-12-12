@@ -326,7 +326,7 @@ void MODEM::parser()
     }
     else
     {
-      SERIAL_PRINTLN(RING_BREAK);
+      RING_BREAK;
       if(admin.index == 0)
       {
         /* Добавление текущего номера в телефонную книгу */
