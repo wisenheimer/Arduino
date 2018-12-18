@@ -25,19 +25,19 @@
 // DTMF команды. Исполняются в файле modem.cpp
 enum {
 	GUARD_ON = 1,	  // 1# - постановка на охрану
-	GUARD_OFF,		  // 2# - снятие с охраны	
+	GUARD_OFF,	  // 2# - снятие с охраны	
 	GPRS_ON_OFF,	  // 3# - включить/отключить GPRS
-	SMS_ON_OFF,		  // 4# - включить/отключить SMS
-	TEL_ON_OFF,		  // 5# - включить/отключить звонок при тревоге
+	SMS_ON_OFF,	  // 4# - включить/отключить SMS
+	TEL_ON_OFF,	  // 5# - включить/отключить звонок при тревоге
 	EMAIL_ADMIN_PHONE,// 6# - отправляем на почту номер админа
 	EMAIL_PHONE_BOOK, // 7# - отправка на почту телефонной книги
 	ADMIN_NUMBER_DEL, // 8# - админ больше не админ
-	SM_CLEAR,		  // 9# - удалить все номера с симкарты
+	SM_CLEAR,	  // 9# - удалить все номера с симкарты
 	MODEM_RESET,	  // 10# - перезагрузка модема
-	BAT_CHARGE	 	  // 11# - показывает заряд батареи в виде строки
-					  //  +CBC: 0,100,4200
-					  // где 100 - процент заряда
-					  // 4200 - напряжение на батарее в мВ.
+	BAT_CHARGE	  // 11# - показывает заряд батареи в виде строки
+			  //  +CBC: 0,100,4200
+			  // где 100 - процент заряда
+			  // 4200 - напряжение на батарее в мВ.
 };
 
 /*
@@ -49,14 +49,14 @@ enum {
 enum pins{
 
 	RING_PIN = 2,	//2 отслеживает вызовы с модема
-	POWER_PIN,		//3 отслеживает наличие питания
-	DOOR_PIN,		//4 датчик двери (геркон). Один конец на GND, второй на цифровой пин arduino.
+	POWER_PIN,	//3 отслеживает наличие питания
+	DOOR_PIN,	//4 датчик двери (геркон). Один конец на GND, второй на цифровой пин arduino.
 	MOVE_PIN,   	//5 все датчики движения вешаем на один пин
 	RADAR_PIN,   	//6 RCWL-0516
-	FIRE_PIN,		//7 датчик огня
-	DHT_PIN,   		//8 датчик температуры и влажности DHT11, DHT21 или DHT22
-	BEEP_PIN,		//9 пищалка
-	BOOT_PIN		//10 перезагрузка модема
+	FIRE_PIN,	//7 датчик огня
+	DHT_PIN,   	//8 датчик температуры и влажности DHT11, DHT21 или DHT22
+	BEEP_PIN,	//9 пищалка
+	BOOT_PIN	//10 перезагрузка модема
 };
 
 /*
@@ -76,20 +76,20 @@ enum pins{
 
 // Сюда надо вписать свои датчики. Размер массива должен равняться количеству датчиков!
 #define SENSORS_INIT Sensor sensors[6]={ \
-	Sensor(DOOR_PIN,	DIGITAL_SENSOR,			"DOOR", 	HIGH,	0), 	\
-	Sensor(RADAR_PIN,	DIGITAL_SENSOR,			"RADAR",	LOW), 			\
-	Sensor(MOVE_PIN,	DIGITAL_SENSOR,			"MOVE", 	LOW), 			\
+	Sensor(DOOR_PIN,	DIGITAL_SENSOR,		"DOOR", 	HIGH,	0), 	\
+	Sensor(RADAR_PIN,	DIGITAL_SENSOR,		"RADAR",	LOW), 			\
+	Sensor(MOVE_PIN,	DIGITAL_SENSOR,		"MOVE", 	LOW), 			\
 	Sensor(FIRE_PIN,	CHECK_DIGITAL_SENSOR,	"FIRE", 	HIGH),			\
-	Sensor(A0,			ANALOG_SENSOR,			"GAS",		LOW,	120),	\
-	Sensor(DHT_PIN,		DHT11,					"DHT",		LOW,	10,	35)};
+	Sensor(A0,		ANALOG_SENSOR,		"GAS",		LOW,	120),	\
+	Sensor(DHT_PIN,		DHT11,			"DHT",		LOW,	10,	35)};
 
 //*****************************************************************
 //////////////////////////////////////////////////////////
 /// Изменить параметры под себя
 //////////////////////////////////////////////////////////
 // Отправка почты
-#define SMTP_SERVER 				F("\"smtp-devices.yandex.com\",25") // почтовый сервер яндекс и порт
-#define SMTP_USER_NAME_AND_PASSWORD F("\"login\",\"password\"") // Лоргин и пароль от почты
+#define SMTP_SERVER			F("\"smtp-devices.yandex.com\",25") // почтовый сервер яндекс и порт
+#define SMTP_USER_NAME_AND_PASSWORD 	F("\"login\",\"password\"") // Лоргин и пароль от почты
 #define SENDER_ADDRESS_AND_NAME 	F("\"login@yandex.com\",\"SIM800L\"")
 #define RCPT_ADDRESS_AND_NAME 		F("\"login@mail.ru\",\"Ivan\"") // Адрес и имя получателя
 //#define RCPT_CC_ADDRESS_AND_NAME 	F("\"login@yandex.com\",\"Ivan\"") // Адрес и имя получателя (копия)
@@ -98,8 +98,8 @@ enum pins{
 //////////////////////////////////////////////////////////
 /// Прочие настройки
 //////////////////////////////////////////////////////////
-#define SERIAL_RATE 				115200 // скорость последовательного порта Serial
-#define RESET_COUNT 				3 	// Сколько раз модем может не ответить до перезагрузки
-#define ALARM_MAX_TIME				60	// продолжительность тревоги в секундах, после чего счётчики срабатываний обнуляются
+#define SERIAL_RATE 	115200 // скорость последовательного порта Serial
+#define RESET_COUNT 	3 	// Сколько раз модем может не ответить до перезагрузки
+#define ALARM_MAX_TIME	60	// продолжительность тревоги в секундах, после чего счётчики срабатываний обнуляются
 
 #endif // SETTINGS_H
