@@ -13,20 +13,21 @@
 
 class DHT {
   public:
-   DHT(uint8_t type, uint8_t count=6);
+   DHT(uint8_t type, uint8_t pin);
    void begin(void);
-   int readTemperature(int PINS);
-   int readHumidity(int PONS);
+   int readTemperature(void);
+   int readHumidity(void);
    boolean read(void);
 
  private:
   uint8_t data[6];
-  uint8_t _pin, _type, _bit, _port;
-  uint32_t _lastreadtime, _maxcycles;
-  bool _firstreading;
+  uint8_t _type, bit, port;
+  uint32_t _lastreadtime;
+  uint16_t _maxcycles;
   bool _lastresult;
+  volatile uint8_t *reg, *out;
 
-  uint32_t expectPulse(bool level);
+  uint16_t expectPulse(bool level);
 
 };
 

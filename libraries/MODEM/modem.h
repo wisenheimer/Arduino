@@ -11,6 +11,8 @@
 
 enum common_flag {
   GUARD_ENABLE, // вкл/откл защиту
+  GPRS_ENABLE,  // отправка отчётов по e-mail
+  SMS_ENABLE,   // отправка отчётов по sms
   ALARM,        // флаг тревоги при срабатывании датчиков
 // флаги модема
   RING_ENABLE,  // включает/выключает звонки
@@ -38,9 +40,7 @@ typedef struct cell
 class MODEM
 {
   public:
-    uint8_t time_last_answer; // время последнего ответа модема
-
-    MODEM::MODEM(uint8_t *sens_enable_flag);
+    MODEM::MODEM();
     ~MODEM();
     TEXT *email_buffer;
     
@@ -52,10 +52,9 @@ class MODEM
   private:
     TEXT *text;
     void (*func_int)();   
-    uint8_t *sens_flag;
     uint8_t answer_flags;
     uint32_t timeRegularOpros;
-    uint8_t DTMF[2];    
+    uint16_t DTMF[2];    
     uint8_t flag_sensor_enable;
     uint8_t phone_num;
     uint8_t cell_num;
@@ -72,13 +71,13 @@ class MODEM
     //void ring(uint8_t index);
     bool get_modem_answer(const char* answer, uint16_t wait_ms);
     bool read_com(const char* answer);
-    void send_message();
     void parser();
     char* get_number_and_type(char* p);
     char* get_name(char* p);
     void email_send_abonent(ABONENT_CELL abonent);
     void guard_info();
     uint8_t get_sm_cell(uint8_t index);
+    void sleep();
 };
 
 #endif

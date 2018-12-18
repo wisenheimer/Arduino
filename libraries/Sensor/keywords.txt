@@ -7,26 +7,14 @@
 ###########################################
 
 Sensor	KEYWORD1
-MY_SENS	KEYWORD1
 
 ###########################################
 # Methods and Functions (KEYWORD2)
 ###########################################
 
-GetInfo KEYWORD2
-Clear KEYWORD2
-ReadPin KEYWORD2
-Count KEYWORD2
-SetOne KEYWORD2
-SetZero KEYWORD2
-Enable KEYWORD2
-SaveEnableTmp KEYWORD2
-RestoreEnable KEYWORD2
-SensOpros KEYWORD2
 get_data KEYWORD2
 get_pin_state KEYWORD2
 get_count KEYWORD2
-get_analog_count KEYWORD2
 get_info KEYWORD2
-get_name_for_type KEYWORD2 
+reinit KEYWORD2
 

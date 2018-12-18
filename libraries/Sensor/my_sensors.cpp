@@ -4,7 +4,7 @@
 MY_SENS::MY_SENS()
 {
 	// Флаг flag_enable разрешает датчикам быть источником для включения режима тревоги.
-	// Каждый бит соответсвует подключенному сенсору, в том порядке, как они перечислены в
+	// Каждый бит соответствует подключенному сенсору, в том порядке, как они перечислены в
 	// массиве sensors[] в файле "settings.h".
 	// Например первый бит - это геркон, второй - радар, третий - датчик движения и т.д.
 	// Если в бит записать 0, то показания датчика будут учитываться только когда наступил режим тревоги,
@@ -13,7 +13,8 @@ MY_SENS::MY_SENS()
 	// от модема, может давать ложные срабатывания от излучения антенны. Чтобы это исключить, можно записать
 	// flag_enable=0b11111001; Тогда при срабатывании геркона мы можем учитывать показания датчиков движения,
 	// как подтверждение, что на объекте кто-то есть.
-	flag_enable=0b11111111;
+
+  flag_enable=0b11111111;
 }
 
 MY_SENS::~MY_SENS()
@@ -32,7 +33,6 @@ void MY_SENS::GetInfo(TEXT *buf)
       sensors[i].get_info(buf);
     }
   }
-
   buf->AddChar('\n');
 }
 
@@ -40,11 +40,6 @@ void MY_SENS::Clear()
 {
 	uint8_t size = sizeof(sensors)/sizeof(Sensor);
   for(uint8_t i=0;i<size;i++) sensors[i].count=0;
-}
-
-bool MY_SENS::ReadPin(uint8_t sens_index)
-{
-	return sensors[sens_index].get_pin_state();
 }
 
 uint8_t MY_SENS::Count(uint8_t sens_index)
@@ -78,20 +73,6 @@ void MY_SENS::RestoreEnable()
 	flag_enable = tmp;
 }
 
-uint8_t MY_SENS::get_check_count(uint8_t sens_index)
-{      
-  uint8_t count = sensors[sens_index].count;
-
-  if(sensors[sens_index].get_count() > count)
-  {
-    // если сенсор сработал, исключаем ложное срабатывание датчика
-    DELAY(10000);
-    if(digitalRead(sensors[sens_index].pin) == sensors[sens_index].level) sensors[sens_index].count = count;
-  } 
-
-  return sensors[sens_index].count;
-}
-
 void MY_SENS::TimeReset()
 {      
   uint8_t size = sizeof(sensors)/sizeof(Sensor);
@@ -114,18 +95,7 @@ uint8_t MY_SENS::SensOpros()
 
     if(Enable(i) && !sensors[i].start_time)
     {
-      switch (sensors[i].type)
-      {
-        case DIGITAL_SENSOR:
-          count += sensors[i].get_count();
-          break;
-        case CHECK_DIGITAL_SENSOR:
-          count += get_check_count(i);
-          break;
-        default:
-          count += sensors[i].get_analog_count();
-          sensors[i].start_time = ANALOG_OPROS_TIME;       
-      }      
+      count += sensors[i].get_count();
     }
   }
 

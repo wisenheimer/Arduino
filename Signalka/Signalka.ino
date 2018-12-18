@@ -1,11 +1,29 @@
 #include "modem.h"
 #include "my_sensors.h"
 
-static uint8_t AlarmTime = 0;
+#ifdef WTD_ENABLE
 
-extern uint8_t flags;
+//#include <avr/wdt.h>
+#include <stdint.h>
+
+uint8_t mcusr_mirror __attribute__ ((section (".noinit")));
+void get_mcusr(void) \
+  __attribute__((naked)) \
+  __attribute__((used)) \
+  __attribute__((section(".init3")));
+void get_mcusr(void)
+{
+  mcusr_mirror = MCUSR;
+  MCUSR = 0;
+  wdt_disable();
+}
+
+#endif
+
 
 static uint32_t msec = 0;
+static uint8_t AlarmTime = 0;
+extern uint8_t flags;
 
 MODEM *phone;
 
@@ -13,9 +31,9 @@ MY_SENS *sensors = NULL;
 
 // активируем флаг тревоги для сбора информации и отправки e-mail
 #define ALARM_ON  if(!GET_FLAG(ALARM)){sensors->SaveEnableTmp();SET_FLAG_ONE(ALARM);AlarmTime=ALARM_MAX_TIME;phone->ring_to_admin(); \
-                  phone->email_buffer->AddText_P(PSTR(" ALARM!"));sensors->GetInfo(phone->email_buffer);}
+                  phone->email_buffer->AddText_P(PSTR(" ALARM!"));sensors->GetInfo(phone->email_buffer);Serial.println(phone->email_buffer->GetText());}
 // по окончании времени ALARM_MAX_TIME обнуляем флаг тревоги и отправляем e-mail с показаниями датчиков
-#define ALARM_OFF {SET_FLAG_ZERO(ALARM);sensors->RestoreEnable();phone->email_buffer->AddText_P(PSTR(" ALL:"));sensors->GetInfo(phone->email_buffer);sensors->Clear();}
+#define ALARM_OFF {SET_FLAG_ZERO(ALARM);sensors->RestoreEnable();phone->email_buffer->AddText_P(PSTR(" ALL:"));sensors->GetInfo(phone->email_buffer);sensors->Clear();Serial.println(phone->email_buffer->GetText());}
 
 // Переменные, создаваемые процессом сборки,
 // когда компилируется скетч
@@ -49,6 +67,13 @@ void power()
 
 void setup()
 {
+#ifdef WTD_ENABLE
+  wdt_disable();
+  wdt_enable(WDTO_8S);
+#endif
+
+  pinMode(RING_PIN, INPUT);
+  digitalWrite(RING_PIN, LOW);
   pinMode(POWER_PIN, INPUT);
   digitalWrite(POWER_PIN, LOW);
   pinMode(BOOT_PIN, OUTPUT);
@@ -59,11 +84,7 @@ void setup()
 
   sensors = new MY_SENS();
   
-  // Подтянем пин к 5 вольтам, чтобы датчик двери мог сработать
-  // при отключении внешнего питания
-  pinMode(DOOR_PIN, INPUT_PULLUP);
-
-  phone = new MODEM(sensors->flag_enable);
+  phone = new MODEM();
 
   phone->init();
 
@@ -102,8 +123,13 @@ void timer(uint16_t time)
 }
 
 void loop()
-{      
-  phone->wiring(); // слушаем модем
-
-  timer(1000);  
+{
+  while(1)
+  {
+#ifdef WTD_ENABLE
+    wdt_reset();
+#endif    
+    phone->wiring(); // слушаем модем
+    timer(1000);
+  }    
 }
