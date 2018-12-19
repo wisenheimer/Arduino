@@ -46,7 +46,7 @@ class Sensor   // название класса
     void get_name_for_type(TEXT *str);  
     
   private:
-    uint8_t alarm_value;    // значение срабатывания аналогового датчика
+    int16_t alarm_value;    // значение срабатывания аналогового датчика
     const char *name;
 #ifdef DHT_ENABLE
     DHT* dht; // датчик температуры и влажности   

@@ -224,6 +224,8 @@ char* MODEM::get_name(char* p)
 
 void MODEM::sleep()
 {
+  email_buffer->Clear();
+
 #ifndef __AVR_ATmega168__
   if(!digitalRead(POWER_PIN) && !GET_FLAG(ALARM))
   {
@@ -240,6 +242,10 @@ void MODEM::sleep()
        
     Serial.flush();
         
+#ifdef WTD_ENABLE
+    wdt_disable();
+#endif 
+
     LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
     // запрещаем прерывания
     PCICR &= ~bit(2);
@@ -254,7 +260,11 @@ void MODEM::sleep()
     }
     while(!GET_MODEM_ANSWER("CSCLK: 0", 1000));
                 
-    if(GET_FLAG(GPRS_ENABLE)) email_buffer->AddText_P(PSTR("WakeUp:"));    
+    if(GET_FLAG(GPRS_ENABLE)) email_buffer->AddText_P(PSTR("WakeUp:"));
+
+#ifdef WTD_ENABLE
+  wdt_enable(WDTO_8S);
+#endif   
   }
 #endif 
 }
@@ -396,12 +406,9 @@ void MODEM::parser()
   }
 
   if (READ_COM_FIND("CMGS:")!=NULL) // +CMGS: <mr> - индекс отправленного сообщения 
-  {
+  { // смс успешно отправлено
     // удаляем все отправленные сообщения
     SERIAL_PRINTLN(F("AT+CMGD=1,3"));
-
-    //EEPROM.update(EEPROM_SMS_ADDRESS, 0x00); // смс успешно отправлено
-    email_buffer->Clear();
     sleep();
     return;
   }
@@ -434,6 +441,7 @@ void MODEM::parser()
   {
     if (READ_COM_FIND_RAM(admin.phone))
     {
+      // звонок или смс от Админа
       SET_FLAG_ANSWER_ONE(admin_phone);
       return;
     }      
@@ -506,10 +514,8 @@ void MODEM::parser()
     if((p = READ_COM_FIND(": 1"))!=NULL)
     {
       gprs_init_count = 0;
-      email_buffer->Clear();
       sleep();
     }
-    else gprs_init_count++;
     return;    
   }
 
@@ -517,12 +523,10 @@ void MODEM::parser()
   {
     if((p = READ_COM_FIND(": 1,1"))!=NULL)
     {
-      gprs_init_count--;
       email();
     }
     else
     {
-      gprs_init_count++;
       GPRS_CONNECT(op_base[gsm_operator])
     }     
   }   
@@ -535,7 +539,7 @@ void MODEM::reinit_end()
   {
     const __FlashStringHelper* cmd[] = {
       F("AT+DDET=1"),         // вкл. DTMF. 
-      //F("ATS0=0"),            // устанавливает количество гудков до автоответа
+      F("ATS0=0"),            // устанавливает количество гудков до автоответа
       F("AT+CLTS=1"),         // синхронизация времени по сети
       F("ATE0"),              // выключаем эхо
       F("AT+CLIP=1"),         // Включаем АОН
@@ -543,7 +547,7 @@ void MODEM::reinit_end()
       F("AT+IFC=1,1"),        // устанавливает программный контроль потоком передачи данных
       F("AT+CSCS=\"GSM\""),   // Режим кодировки текста = GSM (только англ.)
       F("AT+CNMI=2,2,0,0,0"), // Текст смс выводится в com-порт
-      //F("AT+CSCB=1"),       // Отключаем рассылку широковещательных сообщений        
+      F("AT+CSCB=1"),         // Отключаем рассылку широковещательных сообщений        
       //F("AT+CNMI=1,1")      // команда включает отображение номера пришедшей СМСки +CMTI: «MT», <номер смски>
       F("AT+CNMI=2,2"),       // выводит сразу в сериал порт, не сохраняя в симкарте
       F("AT+CPBS=\"SM\""),    // вкл. доступ к sim карте
@@ -558,18 +562,8 @@ void MODEM::reinit_end()
       SERIAL_PRINTLN(cmd[i]);
       if(!GET_MODEM_ANSWER(OK, 10000)) return;
     }   
-/*
-    if(EEPROM.read(EEPROM_FIRST_SMS_ADDRESS) != EEPROM_FIRST_ON_FLAG)
-    {
-      EEPROM.update(EEPROM_FIRST_SMS_ADDRESS, EEPROM_FIRST_ON_FLAG);
-      EEPROM.update(EEPROM_SMS_ADDRESS,0x00);
-      SERIAL_PRINTLN(F("AT+CALA=\"09:00:00\",1,0;+CALA=\"17:00:00\",2,0"));
-    }
-*/
-    if(admin.index == 0)
-    {
-      DTMF[0] = EMAIL_ADMIN_PHONE;        
-    }    
+
+    DTMF[0] = EMAIL_ADMIN_PHONE;        
 
 #ifdef DEBUG_MODE
     SERIAL_PRINTLN(F("init end"));
@@ -703,7 +697,8 @@ void MODEM::wiring() // прослушиваем телефон
         if(GET_FLAG(GPRS_ENABLE))
         {
           if(!GET_FLAG_ANSWER(smtpsend_end))
-          {// проверяем подключение к интернету
+          { // проверяем подключение к интернету
+            gprs_init_count++;
             GPRS_GET_IP; // устанавливаем соединение с интернетом            
           }  
         }
@@ -715,13 +710,10 @@ void MODEM::wiring() // прослушиваем телефон
           SERIAL_PRINT(admin.phone);
           SERIAL_PRINTLN('\"'); 
         }
+        else sleep();
       }      
-    }
-    else
-    {
-      // проверяем непрочитанные смс и уровень сигнала
-      SERIAL_PRINTLN(F("AT+CMGL=\"REC UNREAD\",1;+CSQ"));
-    }
+    } // проверяем непрочитанные смс и уровень сигнала
+    else SERIAL_PRINTLN(F("AT+CMGL=\"REC UNREAD\",1;+CSQ"));
         
     timeRegularOpros = millis();       
   }

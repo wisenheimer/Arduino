@@ -3,7 +3,6 @@
 
 #ifdef WTD_ENABLE
 
-//#include <avr/wdt.h>
 #include <stdint.h>
 
 uint8_t mcusr_mirror __attribute__ ((section (".noinit")));
@@ -31,9 +30,9 @@ MY_SENS *sensors = NULL;
 
 // активируем флаг тревоги для сбора информации и отправки e-mail
 #define ALARM_ON  if(!GET_FLAG(ALARM)){sensors->SaveEnableTmp();SET_FLAG_ONE(ALARM);AlarmTime=ALARM_MAX_TIME;phone->ring_to_admin(); \
-                  phone->email_buffer->AddText_P(PSTR(" ALARM!"));sensors->GetInfo(phone->email_buffer);Serial.println(phone->email_buffer->GetText());}
+                  phone->email_buffer->AddText_P(PSTR(" ALARM!"));sensors->GetInfo(phone->email_buffer);}
 // по окончании времени ALARM_MAX_TIME обнуляем флаг тревоги и отправляем e-mail с показаниями датчиков
-#define ALARM_OFF {SET_FLAG_ZERO(ALARM);sensors->RestoreEnable();phone->email_buffer->AddText_P(PSTR(" ALL:"));sensors->GetInfo(phone->email_buffer);sensors->Clear();Serial.println(phone->email_buffer->GetText());}
+#define ALARM_OFF {SET_FLAG_ZERO(ALARM);sensors->RestoreEnable();phone->email_buffer->AddText_P(PSTR(" ALL:"));sensors->GetInfo(phone->email_buffer);sensors->Clear();}
 
 // Переменные, создаваемые процессом сборки,
 // когда компилируется скетч
