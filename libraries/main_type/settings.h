@@ -26,9 +26,9 @@
 
 //////////////////////////////////////////////////////////
 // Подключаемые библиотеки.
-// Не нужные закомментировать для экономии памяти
+// Для отключения библиотеки и экономии памяти 1 меняем на 0 и наоборот
 //////////////////////////////////////////////////////////
-#	define WTD_ENABLE	1 // Используем watchdog
+#	define WTD_ENABLE	0 // Используем watchdog
 #	define IR_ENABLE	1 // библиотека для ик приёмника
 #	define BEEP_ENABLE	0 // пищалка, не работает совместно с IR_ENABLE
 #	define DHT_ENABLE	1 // библиотека датчиков DHT11, DHT21 и DHT22
@@ -102,21 +102,21 @@ enum pins {
 
 // Сюда надо вписать свои датчики. Размер массива должен равняться количеству датчиков!
 #	define SENSORS_INIT Sensor sensors[8]={ \
-		Sensor(DOOR_PIN,	DIGITAL_SENSOR,			"DOOR", 	HIGH,	0), 	\
-		Sensor(RADAR_PIN,	DIGITAL_SENSOR,			"RADAR",	LOW), 			\
-		Sensor(MOVE_PIN,	DIGITAL_SENSOR,			"MOVE", 	LOW), 			\
+		Sensor(DOOR_PIN,	DIGITAL_SENSOR,		"DOOR", 	HIGH,	0), 	\
+		Sensor(RADAR_PIN,	DIGITAL_SENSOR,		"RADAR",	LOW), 			\
+		Sensor(MOVE_PIN,	DIGITAL_SENSOR,		"MOVE", 	LOW), 			\
 		Sensor(FIRE_PIN,	CHECK_DIGITAL_SENSOR,	"FIRE", 	HIGH),			\
-		Sensor(				IR_SENSOR,				"IR_0",		0x41038C7),		\
-		Sensor(A0,			ANALOG_SENSOR,			"GAS",		LOW,	120),	\
-		Sensor(A1,			TERMISTOR,				"TERM",		LOW,	10, 45),\
-		Sensor(DHT_PIN,		DHT11,					"DHT",		LOW,	10,	45)};
+		Sensor(			IR_SENSOR,		"IR_0",		0x41038C7),		\
+		Sensor(A0,		ANALOG_SENSOR,		"GAS",		LOW,	120),	\
+		Sensor(A1,		TERMISTOR,		"TERM",		LOW,	10, 45),\
+		Sensor(DHT_PIN,		DHT11,			"DHT",		LOW,	10,	45)};
 
 	//*****************************************************************
 	//////////////////////////////////////////////////////////
 	/// Изменить параметры под себя
 	//////////////////////////////////////////////////////////
 	// Отправка почты
-#	define SMTP_SERVER					F("\"smtp-devices.yandex.com\",25") // почтовый сервер яндекс и порт
+#	define SMTP_SERVER			F("\"smtp-devices.yandex.com\",25") // почтовый сервер яндекс и порт
 #	define SMTP_USER_NAME_AND_PASSWORD	F("\"login\",\"password\"") // Лоргин и пароль от почты
 #	define SENDER_ADDRESS_AND_NAME		F("\"login@yandex.com\",\"SIM800L\"")
 #	define RCPT_ADDRESS_AND_NAME		F("\"login@mail.ru\",\"Ivan\"") // Адрес и имя получателя
@@ -138,9 +138,8 @@ enum pins {
 
 //////////////////////////////////////////////////////////
 // Подключаемые библиотеки.
-// Не нужные закомментировать для экономии памяти
 //////////////////////////////////////////////////////////
-#	define WTD_ENABLE	1 // Используем watchdog
+#	define WTD_ENABLE	0 // Используем watchdog
 #	define DHT_ENABLE	0 // библиотека датчиков DHT11, DHT21 и DHT22
 #	define TERM_ENABLE	0 // библиотека для термистора
 //////////////////////////////////////////////////////////
