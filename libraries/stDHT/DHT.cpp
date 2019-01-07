@@ -1,8 +1,20 @@
 #include "stDHT.h"
 
-DHT::DHT(uint8_t type, uint8_t pin) 
+//////////////////////////////////////////////////////////
+/// Настройки термистора (если используется)
+//////////////////////////////////////////////////////////
+#define BCOEFFICIENT 3950
+#define TEMPERATURENOMINAL 25
+// сопротивление при 25 градусах по Цельсию
+#define THERMISTOR_OM 10000
+// сопротивление второго резистора
+#define RESISTOR_OM 9850
+
+
+DHT::DHT(uint8_t type,uint8_t pin)
 {
-  _type = type;	 
+  _type = type;
+  _pin = pin; 
   _lastreadtime = 0;
   _lastresult = 0;
   _maxcycles = microsecondsToClockCycles(1000);
@@ -17,7 +29,7 @@ int DHT::readTemperature(void)
   int f = NAN;
 
   if (port == NOT_A_PIN) return f;
-  
+
   if(read()) 
   {
     switch (_type) 
@@ -83,18 +95,18 @@ boolean DHT::read(void)
 
   data[0] = data[1] = data[2] = data[3] = data[4] = 0;
 
-  *out |= bit;
+  *out |= bit; // digitalWrite(_pin, HIGH);
   delay(50);//////////////////////// Изначально это значение было - 250. Если что-то будет работать "криво",
   ////////////////////////////////// попробуйте увеличивать значение с 50-ти до 60 и т.д.
 
-  *reg |= bit;
-  *out &= ~bit;
+  *reg |= bit;  //pinMode(_pin, OUTPUT);
+  *out &= ~bit; //digitalWrite(_pin, LOW);
   delay(20); 
 
   InterruptLock lock;
-  *out |= bit;
+  *out |= bit;  //digitalWrite(_pin, HIGH);
   delayMicroseconds(40);
-  *reg &= ~bit;
+  *reg &= ~bit; //pinMode(_pin, INPUT);
   delayMicroseconds(10);  
 
   if(!expectPulse(LOW) || !expectPulse(HIGH)) 

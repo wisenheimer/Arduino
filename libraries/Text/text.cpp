@@ -14,7 +14,7 @@ TEXT::~TEXT()
   free(Buffer);
 }
 
-uint8_t TEXT::AddText(const char* str)
+uint8_t TEXT::AddText(char* str)
 {
   while(AddChar(*str++));
 }

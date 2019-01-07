@@ -1,4 +1,22 @@
 #include "sensor.h"
+#include "termistor.h"
+
+Sensor::Sensor( // типы датчиков перечислены в "sensor.h"
+                uint8_t _type,
+                // имя датчика
+                char* sens_name,
+                // ик код
+                uint32_t ir_code)
+{
+  type = _type;
+  name = (char*)malloc(strlen(sens_name)+1);
+  strcpy(name, sens_name);
+  alarm_value = ir_code;
+  count = 0;
+#if IR_ENABLE
+  IRrecvInit();
+#endif 
+}
 
 Sensor::Sensor( // пин ардуино
                 uint8_t _pin,
@@ -11,21 +29,22 @@ Sensor::Sensor( // пин ардуино
                 // время на подготовку датчика при старте
                 uint8_t start_time_sec = 10,
                 // значение срабатывания аналогового датчика
-                uint8_t alarm_val = 200)
+                uint32_t alarm_val = 200)
 {
   pin = _pin;
   type = _type;
-  name = (char*)calloc(1,strlen(sens_name)+1);
+  name = (char*)malloc(strlen(sens_name)+1);
   strcpy(name, sens_name);
-
+  
   start_time = start_time_sec;
   end_time   = start_time_sec;
     
   alarm_value = alarm_val;
   count = 0;
+  check = false;
 
-#ifdef DHT_ENABLE
-  if(type == DHT11 || type == DHT21 || type == DHT22)
+#if DHT_ENABLE
+  if(type >= DHT11 && type <= DHT22)
   {
     // Инициализируем датчик температуры и влажности
     dht = new DHT(type, pin);
@@ -33,6 +52,7 @@ Sensor::Sensor( // пин ардуино
   }
 #endif
   pinMode(pin, INPUT); // устанавливаем пин в качестве входа для считывания показаний
+  if(type == TERMISTOR) return;
   digitalWrite(pin, LOW);
   level = pinLevel;
   prev_pin_state = level;   
@@ -40,8 +60,8 @@ Sensor::Sensor( // пин ардуино
 
 Sensor::~Sensor()
 {
-#ifdef DHT_ENABLE
-  if(type == DHT11 || type == DHT21 || type == DHT22)
+#if DHT_ENABLE
+  if(type >= DHT11 && type <= DHT22)
   {
   // Инициализируем датчик температуры и влажности
     delete dht;
@@ -59,10 +79,18 @@ bool Sensor::get_pin_state()
     if(level==prev_pin_state)
     {
       // если сенсор сработал, исключаем ложное срабатывание датчика
-      if(type==CHECK_DIGITAL_SENSOR) start_time = 10; // опросим повторно через 10 сек
+      if(type==CHECK_DIGITAL_SENSOR)
+      {
+        start_time = 10; // опросим повторно через 10 сек
+        check = true;
+      } 
       else count++;
     }
-    else if(type==CHECK_DIGITAL_SENSOR) count++; 
+    else if(check)
+    {
+      check = false;
+      count++;
+    }  
   }
 
   prev_pin_state = state;
@@ -76,6 +104,11 @@ uint8_t Sensor::get_count()
   
   switch (type)
   {
+#if IR_ENABLE
+    case IR_SENSOR:
+      if(alarm_value == IRgetValue()) count++;
+      break;
+#endif
     case DIGITAL_SENSOR:
     case CHECK_DIGITAL_SENSOR:
       get_pin_state();
@@ -84,8 +117,13 @@ uint8_t Sensor::get_count()
       start_time = 10;
       // если показание аналогового датчика превысило пороговое значение
 
-#ifdef DHT_ENABLE
+#if DHT_ENABLE
       if(type == DHT11 || type == DHT21 || type == DHT22) val = dht->readTemperature();
+      else
+#endif
+
+#if TERM_ENABLE
+      if(type == TERMISTOR) val = readTemperature(pin);
       else
 #endif
       val = analogRead(pin);
@@ -104,7 +142,11 @@ void Sensor::get_info(TEXT *str)
 
   switch (type)
   {
-#ifdef DHT_ENABLE
+    case ANALOG_SENSOR:
+      str->AddInt(analogRead(pin));
+      break;
+    
+#if DHT_ENABLE
     case DHT11:
     case DHT21:
     case DHT22:
@@ -112,12 +154,23 @@ void Sensor::get_info(TEXT *str)
       str->AddInt(dht->readTemperature());
       str->AddText_P(PSTR("C,h="));
       str->AddInt(dht->readHumidity());
-      str->AddChar('%');     
+      str->AddChar('%');
       break;
 #endif
-    case ANALOG_SENSOR:
-      str->AddInt(analogRead(pin));
+
+#if TERM_ENABLE
+    case TERMISTOR:
+      str->AddText_P(PSTR("t="));
+      str->AddInt(readTemperature(pin));
+      str->AddChar('C');  
       break;
+#endif
+
+    case IR_SENSOR:
+      // добавляем число срабатываний датчика
+      str->AddInt(count);
+      break;
+
     default:
       char val = get_pin_state() + '0';
       // добавляем число срабатываний датчика
@@ -127,4 +180,5 @@ void Sensor::get_info(TEXT *str)
       str->AddChar(val);
       str->AddChar(')');
   }
+  str->AddChar(' ');
 }

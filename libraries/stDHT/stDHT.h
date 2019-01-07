@@ -8,12 +8,12 @@
 #endif
 
 #define DHT11 11
-#define DHT22 22
 #define DHT21 21
+#define DHT22 22
 
-class DHT {
+class DHT{
   public:
-   DHT(uint8_t type, uint8_t pin);
+   DHT(uint8_t type,uint8_t pin);
    void begin(void);
    int readTemperature(void);
    int readHumidity(void);
@@ -21,7 +21,7 @@ class DHT {
 
  private:
   uint8_t data[6];
-  uint8_t _type, bit, port;
+  uint8_t _type, _pin, bit, port;
   uint32_t _lastreadtime;
   uint16_t _maxcycles;
   bool _lastresult;

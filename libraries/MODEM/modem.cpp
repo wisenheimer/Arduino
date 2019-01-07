@@ -1,7 +1,13 @@
 #include "modem.h"
-#include "settings.h"
+#include <avr/sleep.h>
+#include <avr/power.h>
+
+#if WTD_ENABLE
+  #include <avr/wdt.h>
+#endif
 
 uint8_t flags = 0;
+extern MY_SENS *sensors;
 
 enum answer {email_end, smtpsend, smtpsend_end, admin_phone};
 
@@ -15,11 +21,11 @@ enum answer {email_end, smtpsend, smtpsend_end, admin_phone};
 #define OK   "OK"
 #define ERR  "ERROR"
 
-// Чтение смс
-#define SIM_RECORDS_INFO  F("AT+CPBS?") // определить количество занятых записей и их общее число
+// определить количество занятых записей и их общее число
+#define SIM_RECORDS_INFO  F("AT+CPBS?")
 
 #define MODEM_GET_STATUS  F("AT+CPAS")
-  #define NOT_READY             "CPAS: 1"
+  #define NOT_READY       "CPAS: 1"
 
 #define RING_BREAK        SERIAL_PRINTLN(F("ATH")) // разорвать все соединения
 
@@ -29,17 +35,11 @@ enum answer {email_end, smtpsend, smtpsend_end, admin_phone};
                           SERIAL_PRINT(PGM_TO_CHAR(op.user));SERIAL_PRINT(F("\";+SAPBR=3,1,\"PWD\",\""));\
                           SERIAL_PRINT(PGM_TO_CHAR(op.user));SERIAL_PRINTLN(F("\";+SAPBR=1,1"));}
 
-#define TEXT_BUFFER_SIZE  100
-#define EMAIL_BUFFER_SIZE 255
-
 // Выставляем тайминги (мс)
 // время между опросами модема на предмет зависания и неотправленных смс/email
-#define REGULAR_OPROS_TIME  60000
+#define REGULAR_OPROS_TIME  50000
 
 // ****************************************
-#define SERIAL_PRINT    Serial.print
-#define SERIAL_PRINTLN  Serial.println
-
 #define ADMIN_PHONE_SET_ZERO  memset(&admin,0,sizeof(ABONENT_CELL))
 
 #define PGM_TO_CHAR(str) strcpy_P(text->GetText()+text->index+1,(char*)pgm_read_word(&(str))) 
@@ -107,7 +107,7 @@ ADD_BREAK(2,"BUSY");
 
 const char* const ath[] PROGMEM = {ath_0, ath_1, ath_2};
 
-#ifdef BEEP_ENABLE
+#if BEEP_ENABLE
 
   void beep()
   {
@@ -126,12 +126,15 @@ const char* const ath[] PROGMEM = {ath_0, ath_1, ath_2};
 
 #endif
 
-#ifndef __AVR_ATmega168__
+//****************обработчик прерывания********************
 /*
   О прерываниях подробно https://arduinonsk.ru/blog/87-all-pins-interrupts
 */
-#include "LowPower.h"
-void wakeUp(){}
+
+void ring()
+{
+  SET_FLAG_ONE(INTERRUPT);
+} 
 
 #ifdef __cplusplus
 extern "C"{
@@ -142,7 +145,7 @@ extern "C"{
 }
 #endif
 
-#endif
+//**********************************************************
 
 MODEM::MODEM()
 {
@@ -162,9 +165,7 @@ MODEM::~MODEM()
 
 void MODEM::reinit()
 {
-#ifdef DEBUG_MODE
-  SERIAL_PRINTLN(F("BOOT"));
-#endif
+  DEBUG_PRINTLN(F("BOOT"));
 
   POWER_ON; // Включение GSM модуля
 
@@ -187,11 +188,10 @@ void MODEM::init()
 
   ADMIN_PHONE_SET_ZERO;
 
-  text         = new TEXT(TEXT_BUFFER_SIZE);
-  email_buffer = new TEXT(EMAIL_BUFFER_SIZE);
+  text         = new TEXT(80);
+  email_buffer = new TEXT(255);
 
-  //SET_FLAG_ZERO(GUARD_ENABLE);
-  //SET_FLAG_ZERO(ALARM);
+  SET_FLAG_ONE(RING_ENABLE);
   OTCHET_INIT
 }
 
@@ -223,32 +223,31 @@ char* MODEM::get_name(char* p)
 }
 
 void MODEM::sleep()
-{
-  email_buffer->Clear();
+{  
+#if SLEEP_MODE_ENABLE
 
-#ifndef __AVR_ATmega168__
   if(!digitalRead(POWER_PIN) && !GET_FLAG(ALARM))
   {
     // Маскируем прерывания
-    PCMSK2 |= 0b11110000;
-    PCMSK0 = 0xFF;
-  
+    PCMSK2 = 0b11110000;
     // разрешаем прерывания
-    PCICR |= bit(2);
+    PCICR = bit(2);
     // Прерывание для RING
-    attachInterrupt(0, wakeUp, LOW); //Если на 0-вом прерываниии - ноль, то просыпаемся.
+    attachInterrupt(0, ring, LOW); //Если на 0-вом прерываниии - ноль, то просыпаемся.
       
     SERIAL_PRINTLN(F("AT+CSCLK=2")); // Режим энергосбережения
        
     Serial.flush();
         
-#ifdef WTD_ENABLE
+#if WTD_ENABLE
     wdt_disable();
 #endif 
 
-    LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    sleep_mode(); // Переводим МК в спящий режим
+
     // запрещаем прерывания
-    PCICR &= ~bit(2);
+    PCICR = 0;
     detachInterrupt(0);
 
     do
@@ -262,7 +261,7 @@ void MODEM::sleep()
                 
     if(GET_FLAG(GPRS_ENABLE)) email_buffer->AddText_P(PSTR("WakeUp:"));
 
-#ifdef WTD_ENABLE
+#if WTD_ENABLE
   wdt_enable(WDTO_8S);
 #endif   
   }
@@ -321,7 +320,6 @@ void MODEM::parser()
     if(strstr_P(pp,(char*)pgm_read_word(&abonent_name[ADMIN]))!=NULL)
     {
       admin = last_abonent;
-      SET_FLAG_ONE(RING_ENABLE);
     }
     return;
   }
@@ -359,11 +357,10 @@ void MODEM::parser()
       }
     } 
     
-#ifdef DEBUG_MODE
-      SERIAL_PRINT(F("admin.index=")); SERIAL_PRINTLN(admin.index);
-      SERIAL_PRINT(F("admin.phone=")); SERIAL_PRINTLN(admin.phone);
-      SERIAL_PRINT(F("last_abonent.phone=")); SERIAL_PRINTLN(last_abonent.phone);
-#endif    
+    DEBUG_PRINT(F("admin.index=")); DEBUG_PRINTLN(admin.index);
+    DEBUG_PRINT(F("admin.phone=")); DEBUG_PRINTLN(admin.phone);
+    DEBUG_PRINT(F("last_abonent.phone=")); DEBUG_PRINTLN(last_abonent.phone);
+
     return;
   }
 
@@ -409,7 +406,7 @@ void MODEM::parser()
   { // смс успешно отправлено
     // удаляем все отправленные сообщения
     SERIAL_PRINTLN(F("AT+CMGD=1,3"));
-    sleep();
+    email_buffer->Clear();
     return;
   }
   
@@ -474,6 +471,7 @@ void MODEM::parser()
     if(READ_COM_FIND_P(ath[i])!=NULL)
     {
       RING_BREAK;
+      dtmf_index = 0;
       return;
     }
   }
@@ -514,7 +512,7 @@ void MODEM::parser()
     if((p = READ_COM_FIND(": 1"))!=NULL)
     {
       gprs_init_count = 0;
-      sleep();
+      email_buffer->Clear();
     }
     return;    
   }
@@ -565,29 +563,50 @@ void MODEM::reinit_end()
 
     DTMF[0] = EMAIL_ADMIN_PHONE;        
 
-#ifdef DEBUG_MODE
-    SERIAL_PRINTLN(F("init end"));
-#endif
+    DEBUG_PRINTLN(F("init end"));
+
     SET_FLAG_ZERO(MODEM_NEED_INIT_MODEM);  
   }     
 }
 
-void MODEM::guard_info()
+// Переменные, создаваемые процессом сборки,
+// когда компилируется скетч
+extern int __bss_end;
+extern void *__brkval;
+
+// Функция, возвращающая количество свободного ОЗУ (RAM)
+int memoryFree()
 {
-  email_buffer->AddText_P(PSTR("GUARD="));
-  email_buffer->AddInt(GET_FLAG(GUARD_ENABLE));
-  email_buffer->AddChar('\n');
+   int freeValue;
+   if((int)__brkval == 0)
+      freeValue = ((int)&freeValue) - ((int)&__bss_end);
+   else
+      freeValue = ((int)&freeValue) - ((int)__brkval);
+   return freeValue;
 }
 
-#define DELETE_PHONE(index)           {SERIAL_PRINT(F("AT+CPBW="));SERIAL_PRINTLN(index);}
-#define ON_OFF_FLAG_STATUS(flag,name) email_buffer->AddText_P(PSTR(name));email_buffer->AddInt(GET_FLAG(flag))
-#define ON_OFF_FLAG(flag,name)        INVERT_FLAG(flag);ON_OFF_FLAG_STATUS(flag,name)
+#define DELETE_PHONE(index)    {SERIAL_PRINT(F("AT+CPBW="));SERIAL_PRINTLN(index);}
+#define FLAG_STATUS(flag,name) email_buffer->AddText_P(PSTR(name));email_buffer->AddInt(GET_FLAG(flag));email_buffer->AddChar(' ')
+
+void MODEM::flags_info()
+{
+  FLAG_STATUS(GUARD_ENABLE, "GUARD=");
+  FLAG_STATUS(RING_ENABLE,  "TEL=");
+  FLAG_STATUS(GPRS_ENABLE,  "GPRS=");
+  FLAG_STATUS(SMS_ENABLE,   "SMS=");
+}
 
 void MODEM::wiring() // прослушиваем телефон
 {
   uint8_t tmp;
 
   read_com(NULL);
+
+  if(GET_FLAG(INTERRUPT))
+  {
+    SET_FLAG_ZERO(INTERRUPT);
+    DTMF[0] = GET_INFO;
+  }
 
   if(DTMF[0])
   {
@@ -604,21 +623,52 @@ void MODEM::wiring() // прослушиваем телефон
     switch (DTMF[0])
     {
       case GUARD_ON:
-        SET_FLAG_ONE(GUARD_ENABLE);
-        guard_info();
+        if(!GET_FLAG(GUARD_ENABLE))
+        {
+          if(sensors = new MY_SENS())
+          {
+            SET_FLAG_ONE(GUARD_ENABLE);
+
+            DEBUG_PRINT(F("RAM free:"));
+            DEBUG_PRINTLN(memoryFree()); // печать количества свободной оперативной памяти
+          }          
+        }
+        flags_info();
         break;                        
       case GUARD_OFF:
-        SET_FLAG_ZERO(GUARD_ENABLE);       
-        guard_info();
+        if(GET_FLAG(GUARD_ENABLE))
+        {
+          SET_FLAG_ZERO(GUARD_ENABLE);
+          delete sensors;
+
+          DEBUG_PRINT(F("RAM free:"));
+          DEBUG_PRINTLN(memoryFree()); // печать количества свободной оперативной памяти
+        }        
+        flags_info();
         break;        
       case TEL_ON_OFF:
-        ON_OFF_FLAG(RING_ENABLE, "TEL=");     
+        INVERT_FLAG(RING_ENABLE);
+        flags_info();     
+        break;
+      case GET_INFO:
+        if(digitalRead(POWER_PIN))
+        {
+          if(GET_FLAG(GUARD_ENABLE)) sensors->TimeReset();
+          email_buffer->AddText_P(PSTR(" Svet ON."));
+        }           
+        else
+          email_buffer->AddText_P(PSTR(" Svet OFF."));
+        flags_info();
+        if(GET_FLAG(GUARD_ENABLE)) sensors->GetInfoAll(email_buffer);
+        DEBUG_PRINTLN(email_buffer->GetText());
         break;
       case GPRS_ON_OFF:
-        ON_OFF_FLAG(GPRS_ENABLE, "GPRS=");      
+        INVERT_FLAG(GPRS_ENABLE);
+        flags_info();      
         break;
       case SMS_ON_OFF:
-        ON_OFF_FLAG(SMS_ENABLE, "SMS=");     
+        INVERT_FLAG(SMS_ENABLE);
+        flags_info();             
         break;
       case BAT_CHARGE:
         SERIAL_PRINTLN(F("AT+CBC"));
@@ -681,8 +731,6 @@ void MODEM::wiring() // прослушиваем телефон
       else DTMF[0]=MODEM_RESET;
     }   
    
-    reset_count++;
-    
     reinit_end(); 
 
     // Есть данные для отправки
@@ -691,6 +739,7 @@ void MODEM::wiring() // прослушиваем телефон
       if(gsm_operator == op_count)
       {
         SERIAL_PRINTLN(F("AT+COPS?"));
+        reset_count++;
       }
       else
       {
@@ -709,11 +758,17 @@ void MODEM::wiring() // прослушиваем телефон
           SERIAL_PRINT(F("AT+CMGS=\""));
           SERIAL_PRINT(admin.phone);
           SERIAL_PRINTLN('\"'); 
+          reset_count++;
         }
-        else sleep();
+        else email_buffer->Clear();
       }      
     } // проверяем непрочитанные смс и уровень сигнала
-    else SERIAL_PRINTLN(F("AT+CMGL=\"REC UNREAD\",1;+CSQ"));
+    else
+    {
+      sleep();
+      reset_count++;
+      SERIAL_PRINTLN(F("AT+CMGL=\"REC UNREAD\",1;+CSQ"));
+    } 
         
     timeRegularOpros = millis();       
   }
@@ -789,10 +844,10 @@ bool MODEM::read_com(const char* answer)
     }    
     // если получили символ новой строки, оповещаем программу об этом,
     // чтобы она могла принять дальнейшие действия.
-    if (inChar == '\n') {
-#ifdef DEBUG_MODE
-      SERIAL_PRINT(text->GetText());
-#endif
+    if (inChar == '\n')
+    {
+      DEBUG_PRINT(text->GetText());
+
       if(text->index > 1)
       {
         reset_count = 0;
@@ -821,7 +876,7 @@ bool MODEM::get_modem_answer(const char* answer, uint16_t wait_ms)
   do
   {    
     res = read_com(answer);
-#ifdef WTD_ENABLE
+#if WTD_ENABLE
     wdt_reset();
 #endif        
   }

@@ -1,10 +1,9 @@
 #ifndef myText_h
 #define myText_h
 
-//#pragma once /* Защита от двойного подключения заголовочного файла */
 #include "Arduino.h"
 
-class TEXT // название класса
+class TEXT
 {
   public:
     TEXT(uint8_t Size);
@@ -12,8 +11,7 @@ class TEXT // название класса
 
     uint8_t index;
     uint8_t free_space;
-    // собирает текст для печати
-    uint8_t AddText(const char* str);
+    uint8_t AddText(char* str);
     uint8_t AddText_P(const char* str);
     bool AddChar(char ch);
     void AddInt(int i);

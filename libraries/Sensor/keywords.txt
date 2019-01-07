@@ -7,6 +7,7 @@
 ###########################################
 
 Sensor	KEYWORD1
+MY_SENS KEYWORD1
 
 ###########################################
 # Methods and Functions (KEYWORD2)
@@ -17,4 +18,10 @@ get_pin_state KEYWORD2
 get_count KEYWORD2
 get_info KEYWORD2
 reinit KEYWORD2
+
+GetInfo KEYWORD2
+GetInfoAll KEYWORD2
+Clear KEYWORD2
+SensOpros KEYWORD2
+TimeReset KEYWORD2
 

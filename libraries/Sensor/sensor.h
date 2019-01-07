@@ -2,13 +2,15 @@
 #define SENS_h
 
 #include "Arduino.h"
-#include "text.h"
 #include "settings.h"
+#include "text.h"
 
-#ifdef DHT_ENABLE
+#if IR_ENABLE
+#   include "ir.h"
+#endif
 
-  #include "stDHT.h"
-
+#if DHT_ENABLE
+#   include "stDHT.h"
 #endif
 
 // Сюда добавляем типы датчиков
@@ -18,12 +20,16 @@ enum {  // датчик с одним цифровым выходом
         // с проверкой от ложного срабатывания
         CHECK_DIGITAL_SENSOR,
         // датчик с аналоговым выходом
-        ANALOG_SENSOR           
+        ANALOG_SENSOR,
+        // беспроводной датчик с ик диодом
+        IR_SENSOR,
+        // датчик температуры - термистор
+        TERMISTOR          
         //DHT11, DHT21, DHT22 - датчики температуры
         // и влажности, объявлены в stDHT.h
 };
 
-class Sensor   // название класса
+class Sensor
 {
   public:
 
@@ -37,7 +43,8 @@ class Sensor   // название класса
     bool level;    // высокий или низкий уровень пина
     bool prev_pin_state; // предыдущее состояние пина
    
-    Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = LOW, uint8_t start_time_sec = 10, uint8_t alarm_val = 200);
+    Sensor(uint8_t _type, char* sens_name, uint32_t ir_code);
+    Sensor(uint8_t _pin, uint8_t _type, char* sens_name, uint8_t pinLevel = LOW, uint8_t start_time_sec = 10, uint32_t alarm_val = 200);
     ~Sensor();
     
     bool get_pin_state();       // возвращает state = digitalRead(pin). Если состояние изменилось, увеличивет счётчик срабатываний на 1.
@@ -46,9 +53,10 @@ class Sensor   // название класса
     void get_name_for_type(TEXT *str);  
     
   private:
-    int16_t alarm_value;    // значение срабатывания аналогового датчика
-    const char *name;
-#ifdef DHT_ENABLE
+    bool check;
+    int32_t alarm_value; // значение срабатывания аналогового датчика
+    char *name;
+#if DHT_ENABLE
     DHT* dht; // датчик температуры и влажности   
 #endif
 };
