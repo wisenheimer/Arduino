@@ -29,9 +29,9 @@ void get_mcusr(void)
 
 #endif
 
-// активируем флаг тревоги для сбора информации и отправки e-mail
+// активируем флаг тревоги для сбора информации и отправки ик кода на сигнализацию
 #define ALARM_ON  if(!GET_FLAG(ALARM)){SET_FLAG_ONE(ALARM);AlarmTime=ALARM_MAX_TIME;}
-// по окончании времени ALARM_MAX_TIME обнуляем флаг тревоги и отправляем e-mail с показаниями датчиков
+// по окончании времени ALARM_MAX_TIME обнуляем флаг тревоги
 #define ALARM_OFF {SET_FLAG_ZERO(ALARM);sensors->Clear();}
 
 static uint32_t msec = 0;
@@ -69,7 +69,7 @@ void timer(uint16_t time)
       if(AlarmTime) AlarmTime--;
       else // По истечении заданного времени ALARM_MAX_TIME 
       {
-        ALARM_OFF; // Выключаем режим тревоги и отправляем e-mail. Очищаем статистику датчиков.            
+        ALARM_OFF; // Выключаем режим тревоги. Очищаем статистику датчиков.            
       }
     } 
   }
