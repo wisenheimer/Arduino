@@ -10,7 +10,7 @@
 
 IRsend irsend;
 
-#ifdef WTD_ENABLE
+#if WTD_ENABLE
 
 #include <avr/wdt.h>
 #include <stdint.h>
@@ -42,7 +42,7 @@ MY_SENS *sensors = NULL;
 
 void setup()
 {
-#ifdef WTD_ENABLE
+#if WTD_ENABLE
   wdt_disable();
   wdt_enable(WDTO_8S);
 #endif
@@ -79,7 +79,7 @@ void loop()
 {
   while(1)
   {
-#ifdef WTD_ENABLE
+#if WTD_ENABLE
     wdt_reset();
 #endif    
     timer(1000);
