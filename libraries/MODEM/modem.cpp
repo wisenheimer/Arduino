@@ -794,7 +794,7 @@ void MODEM::wiring() // прослушиваем телефон
           }  
         }
         else
-        if(GET_FLAG(SMS_ENABLE))
+        if(GET_FLAG(SMS_ENABLE) && admin.phone[0])
         { // отправка смс
           // "AT+CMGS=\"+79xxxxxxxxx\""
           SERIAL_PRINT(F("AT+CMGS=\""));
