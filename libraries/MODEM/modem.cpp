@@ -443,6 +443,48 @@ void MODEM::parser()
       return;
     }      
   }
+  
+  // получаем смс вида "set pin 14 on" "set pin 14 off"
+  // задание пину значения HIGH или LOW
+  // номер пина от 5 до 21.
+  if ((p=READ_COM_FIND("set pin"))!=NULL)
+  {
+    if (GET_FLAG_ANSWER(admin_phone))
+    {
+      p+=8;
+      uint8_t buf[3];
+      uint8_t i = 0;
+      uint8_t pin;
+      uint8_t level;
+      while(*p>='0' && *p<='9' && i < 2)
+      {
+        buf[i++] = *p++;
+      }
+      buf[i] = 0;
+      pin = atoi(buf);
+
+      if(pin < 5 || pin > 21) return;
+      
+      p++;
+      
+      if(*p == 'o' && *(p+1) == 'n') level = HIGH;
+      else if(*p == 'o' && *(p+1) == 'f' && *(p+2) == 'f') level = LOW;
+      else return;      
+  
+      pinMode(pin, OUTPUT); // устанавливаем пин как выход
+      digitalWrite(pin, level); // устанавливаем пин в 0, для выключения реле
+      // ответное смс
+      email_buffer->AddText_P(PSTR("PIN "));
+      email_buffer->AddInt(pin);
+      email_buffer->AddText_P(PSTR(" is "));
+      email_buffer->AddInt(digitalRead(pin));
+      DEBUG_PRINTLN(email_buffer->GetText()); // отладочное собщение
+
+      SET_FLAG_ANSWER_ZERO(admin_phone);
+    }   
+    
+    return;      
+  }
 
   // получаем смс
   // Выполнение любой AT+ команды
