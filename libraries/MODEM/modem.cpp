@@ -444,9 +444,11 @@ void MODEM::parser()
     }      
   }
   
-  // получаем смс вида "set pin 14 on" "set pin 14 off"
-  // задание пину значения HIGH или LOW
-  // номер пина от 5 до 21.
+  // Получаем смс вида "set pin НОМЕР_ПИНА on/off".
+  // Например, "set pin 14 on" и "set pin 14 off"
+  // задают пину 14 (А0) значения HIGH или LOW соответственно.
+  // Поддерживаются пины от 5 до 19, где 14 соответствует А0, 15 соответствует А1 и т.д
+  // Внимание. Пины A6 и A7 не поддерживаются, т.к. они не работают как цифровые выходы.
   if ((p=READ_COM_FIND("set pin"))!=NULL)
   {
     if (GET_FLAG_ANSWER(admin_phone))
@@ -463,7 +465,7 @@ void MODEM::parser()
       buf[i] = 0;
       pin = atoi(buf);
 
-      if(pin < 5 || pin > 21) return;
+      if(pin < 5 || pin > A5) return;
       
       p++;
       
