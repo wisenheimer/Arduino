@@ -37,7 +37,9 @@ enum answer {email_end, smtpsend, smtpsend_end, admin_phone};
 
 // Выставляем тайминги (мс)
 // время между опросами модема на предмет зависания и неотправленных смс/email
-#define REGULAR_OPROS_TIME  50000
+#define REGULAR_OPROS_TIME_GPRS 50000
+#define REGULAR_OPROS_TIME_SMS  10000
+uint16_t opros_time;
 
 // ****************************************
 #define ADMIN_PHONE_SET_ZERO  memset(&admin,0,sizeof(ABONENT_CELL))
@@ -193,6 +195,8 @@ void MODEM::init()
 
   SET_FLAG_ONE(RING_ENABLE);
   OTCHET_INIT
+  if(GET_FLAG(GPRS_ENABLE)) opros_time = REGULAR_OPROS_TIME_GPRS;
+  else opros_time = REGULAR_OPROS_TIME_SMS;
 }
 
 char* MODEM::get_number_and_type(char* p)
@@ -708,7 +712,9 @@ void MODEM::wiring() // прослушиваем телефон
         break;
       case GPRS_ON_OFF:
         INVERT_FLAG(GPRS_ENABLE);
-        flags_info();      
+        flags_info();
+        if(GET_FLAG(GPRS_ENABLE)) opros_time = REGULAR_OPROS_TIME_GPRS;
+        else opros_time = REGULAR_OPROS_TIME_SMS;
         break;
       case SMS_ON_OFF:
         INVERT_FLAG(SMS_ENABLE);
@@ -762,7 +768,7 @@ void MODEM::wiring() // прослушиваем телефон
   }
 
   // Опрос модема
-  if(millis() - timeRegularOpros > REGULAR_OPROS_TIME)
+  if(millis() - timeRegularOpros > opros_time)
   {
     SET_FLAG_ANSWER_ZERO(admin_phone);
 
