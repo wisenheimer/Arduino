@@ -70,7 +70,7 @@ enum {
 						//  +CBC: 0,100,4200
 						// где 100 - процент заряда
 						// 4200 - напряжение на батарее в мВ.
-	CONNECT_ON_OFF		// 13# - Инвертирует флаг GPRS_CONNECT_ALWAYS
+	CONNECT_ON_OFF		// 13# - Инвертирует флаг CONNECT_ALWAYS
 	};
 
 /*
