@@ -20,8 +20,10 @@
  *	так и беспроводного датчика.
  *	Для прошивки сигнализации в #if пишем 1.
  *	Для прошивки беспроводного датчика в #if пишем 0.
- *	Если #if 1, то компилируется код с 26 до 138 строки, относящийся к скетчу Signalka.ino
- *	Если #if 0, то компилируется код 138 строки и ниже, относящийся к скетчу IRsensor.ino
+ *	Если #if 1, то компилируется код со строки 26 до строки #else,
+ *	относящийся к скетчу Signalka.ino
+ *	Если #if 0, то компилируется код co строки #else и ниже,
+ *	относящийся к скетчу IRsensor.ino
  */
 #if 1 // Настройки сигнализации Signalka.ino
 
@@ -37,9 +39,18 @@
 //////////////////////////////////////////////////////////
 
 //****************************************************
-// Выбор способа получения отчётов (или GPRS, или SMS)
+// Выбор способа получения отчётов (GPRS или SMS).
+// Если разрешить оба флага, приоритет отдаётся GPRS.
+// Если не удастся установить GPRS соединение, сообщения
+// будут отправлены по SMS. Оба флага можно установить
+// DTMF командами GPRS_ON_OFF и SMS_ON_OFF.
+// SET_FLAG_ONE(CONNECT_ALWAYS) запрещает разрывать
+// GPRS соединение для более быстрой отправки писем
+// (подходит для безлимитных тарифов). Можно установить
+// DTMF командой CONNECT_ON_OFF.
+// Отключить любой флаг можно, записав SET_FLAG_ZERO
 //****************************************************
-#	define OTCHET_INIT	SET_FLAG_ONE(GPRS_ENABLE);SET_FLAG_ONE(SMS_ENABLE);
+#	define OTCHET_INIT	SET_FLAG_ONE(GPRS_ENABLE);SET_FLAG_ONE(SMS_ENABLE);SET_FLAG_ONE(CONNECT_ALWAYS);
 //****************************************************
 
 // DTMF команды. Исполняются в файле modem.cpp
@@ -55,10 +66,11 @@ enum {
 	ADMIN_NUMBER_DEL,	// 9# - админ больше не админ
 	SM_CLEAR,			// 10# - удалить все номера с симкарты
 	MODEM_RESET,		// 11# - перезагрузка модема
-	BAT_CHARGE			// 12# - показывает заряд батареи в виде строки
+	BAT_CHARGE,			// 12# - показывает заряд батареи в виде строки
 						//  +CBC: 0,100,4200
 						// где 100 - процент заряда
 						// 4200 - напряжение на батарее в мВ.
+	CONNECT_ON_OFF		// 13# - Инвертирует флаг GPRS_CONNECT_ALWAYS
 	};
 
 /*
@@ -103,14 +115,14 @@ enum pins {
 
 // Сюда надо вписать свои датчики. Размер массива должен равняться количеству датчиков!
 #	define SENSORS_INIT Sensor sensors[8]={ \
-		Sensor(DOOR_PIN,	DIGITAL_SENSOR,		"DOOR", 	HIGH,	0), 	\
-		Sensor(RADAR_PIN,	DIGITAL_SENSOR,		"RADAR",	LOW), 			\
-		Sensor(MOVE_PIN,	DIGITAL_SENSOR,		"MOVE", 	LOW), 			\
+		Sensor(DOOR_PIN,	DIGITAL_SENSOR,			"DOOR", 	HIGH,	0), 	\
+		Sensor(RADAR_PIN,	DIGITAL_SENSOR,			"RADAR",	LOW), 			\
+		Sensor(MOVE_PIN,	DIGITAL_SENSOR,			"MOVE", 	LOW), 			\
 		Sensor(FIRE_PIN,	CHECK_DIGITAL_SENSOR,	"FIRE", 	HIGH),			\
-		Sensor(			IR_SENSOR,		"IR_0",		0x41038C7),		\
-		Sensor(A0,		ANALOG_SENSOR,		"GAS",		LOW,	120),	\
-		Sensor(A1,		TERMISTOR,		"TERM",		LOW,	10, 45),\
-		Sensor(DHT_PIN,		DHT11,			"DHT",		LOW,	10,	45)};
+		Sensor(				IR_SENSOR,				"IR_0",		0x41038C7),		\
+		Sensor(A0,			ANALOG_SENSOR,			"GAS",		LOW,	120),	\
+		Sensor(A1,			TERMISTOR,				"TERM",		LOW,	10, 45),\
+		Sensor(DHT_PIN,		DHT11,					"DHT",		LOW,	10,	45)};
 
 	//*****************************************************************
 	//////////////////////////////////////////////////////////
@@ -119,7 +131,7 @@ enum pins {
 	// Отправка почты
 #	define SMTP_SERVER			F("\"smtp-devices.yandex.com\",25") // почтовый сервер яндекс и порт
 #	define SMTP_USER_NAME_AND_PASSWORD	F("\"login\",\"password\"") // Лоргин и пароль от почты
-#	define SENDER_ADDRESS_AND_NAME		F("\"login@yandex.com\",\"SIM800L\"")
+#	define SENDER_ADDRESS_AND_NAME		F("\"login@yandex.com\",\"SIM800L\"") // почта отправителя
 #	define RCPT_ADDRESS_AND_NAME		F("\"login@mail.ru\",\"Ivan\"") // Адрес и имя получателя
 //#	define RCPT_CC_ADDRESS_AND_NAME		F("\"login@yandex.com\",\"Ivan\"") // Адрес и имя получателя (копия)
 //#	define RCPT_BB_ADDRESS_AND_NAME		F("\"login2@yandex.com\",\"Ivan\"") // Адрес и имя получателя (вторая копия)

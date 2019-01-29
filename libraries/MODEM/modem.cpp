@@ -29,17 +29,22 @@ enum answer {email_end, smtpsend, smtpsend_end, admin_phone};
 
 #define RING_BREAK        SERIAL_PRINTLN(F("ATH")) // разорвать все соединения
 
-#define GPRS_DISCONNECT   SERIAL_PRINTLN(F("AT+SAPBR=0,1"))
-#define GPRS_GET_IP       SERIAL_PRINTLN(F("AT+SAPBR=2,1"))
-#define GPRS_CONNECT(op)  {SERIAL_PRINT(F("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\";+SAPBR=3,1,\"APN\",\"internet\";+SAPBR=3,1,\"USER\",\"")); \
-                          SERIAL_PRINT(PGM_TO_CHAR(op.user));SERIAL_PRINT(F("\";+SAPBR=3,1,\"PWD\",\""));\
-                          SERIAL_PRINT(PGM_TO_CHAR(op.user));SERIAL_PRINTLN(F("\";+SAPBR=1,1"));}
-
 // Выставляем тайминги (мс)
-// время между опросами модема на предмет зависания и неотправленных смс/email
+// время между опросами модема на предмет зависания и не отправленных смс/email
 #define REGULAR_OPROS_TIME_GPRS 50000
 #define REGULAR_OPROS_TIME_SMS  10000
-uint16_t opros_time;
+uint32_t opros_time;
+
+#define GPRS_GET_IP       if(!GET_FLAG_ANSWER(smtpsend_end)){SERIAL_PRINTLN(F("AT+SAPBR=2,1"));gprs_init_count++;opros_time=85000;}
+#define GPRS_CONNECT(op)  {SERIAL_PRINT(F("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\";+SAPBR=3,1,\"APN\",\"internet\";+SAPBR=3,1,\"USER\",\"")); \
+                          SERIAL_PRINT(PGM_TO_CHAR(op.user));SERIAL_PRINT(F("\";+SAPBR=3,1,\"PWD\",\""));\
+                          SERIAL_PRINT(PGM_TO_CHAR(op.user));SERIAL_PRINTLN(F("\";+SAPBR=1,1"));opros_time=REGULAR_OPROS_TIME_GPRS;}
+#define GPRS_DISCONNECT   if(!GET_FLAG(CONNECT_ALWAYS)){SERIAL_PRINTLN(F("AT+SAPBR=0,1"));opros_time=REGULAR_OPROS_TIME_SMS;}
+
+// отправка смс AT+CMGS=\"+79xxxxxxxxx\"
+#define SEND_SMS  if(GET_FLAG(SMS_ENABLE) && admin.phone[0]){ \
+                  SERIAL_PRINT(F("AT+CMGS=\""));SERIAL_PRINT(admin.phone);SERIAL_PRINTLN('\"'); \
+                  opros_time=REGULAR_OPROS_TIME_SMS;}
 
 // ****************************************
 #define ADMIN_PHONE_SET_ZERO  memset(&admin,0,sizeof(ABONENT_CELL))
@@ -171,7 +176,7 @@ void MODEM::reinit()
 
   POWER_ON; // Включение GSM модуля
 
-  SET_FLAG_ONE(MODEM_NEED_INIT_MODEM);
+  SET_FLAG_ONE(MODEM_NEED_INIT);
 
   reset_count = 0;
   gprs_init_count = 0;
@@ -241,7 +246,7 @@ void MODEM::sleep()
       
     SERIAL_PRINTLN(F("AT+CSCLK=2")); // Режим энергосбережения
        
-    Serial.flush();
+    SERIAL_FLUSH;
         
 #if WTD_ENABLE
     wdt_disable();
@@ -314,7 +319,14 @@ void MODEM::parser()
   if((p=READ_COM_FIND("CPBR: "))!=NULL || (p=READ_COM_FIND("CPBF: "))!=NULL)
   {
     p+=6; pp = p;
-    if(GET_FLAG(GPRS_ENABLE)) email_buffer->AddText(p);
+    if(GET_FLAG(GPRS_ENABLE))
+    {
+      email_buffer->AddText(p);
+      if(millis() - timeRegularOpros > opros_time - 1000)
+      { // оставляем время для получения всех записей с симкарты до отправки e-mail
+        timeRegularOpros = millis() - opros_time + 1000;
+      }       
+    }
     while(*p!=',' && *p) p++;
     *p = 0;
     last_abonent.index = atoi(pp);
@@ -546,19 +558,23 @@ void MODEM::parser()
   if(READ_COM_FIND("DOWNLOAD")!=NULL || READ_COM_FIND(">")!=NULL)
   {
     SERIAL_PRINT(email_buffer->GetText());
-    Serial.flush();
-    Serial.write(26);
-    if(GET_FLAG(GPRS_ENABLE)) SET_FLAG_ANSWER_ONE(smtpsend);
+    SERIAL_FLUSH;
+    SERIAL_WRITE(26);
+    if(GET_FLAG(GPRS_ENABLE))
+    { // Ждём OK от модема,
+      // после чего даём команду на отправку письма
+      SET_FLAG_ANSWER_ONE(smtpsend);
+    }
     return;        
   }
 
   if((p = READ_COM_FIND("+SMTPSEND:"))!=NULL)
   {
     SET_FLAG_ANSWER_ZERO(smtpsend_end); 
-    GPRS_DISCONNECT; // разрываем соединение с интернетом
     // письмо успешно отправлено
     if((p = READ_COM_FIND(": 1"))!=NULL)
     {
+      GPRS_DISCONNECT; // разрываем соединение с интернетом
       gprs_init_count = 0;
       email_buffer->Clear();
     }
@@ -570,6 +586,7 @@ void MODEM::parser()
     if((p = READ_COM_FIND(": 1,1"))!=NULL)
     {
       email();
+      opros_time=REGULAR_OPROS_TIME_SMS;
     }
     else
     {
@@ -581,7 +598,7 @@ void MODEM::parser()
 
 void MODEM::reinit_end()
 {
-  if(GET_FLAG(MODEM_NEED_INIT_MODEM))
+  if(GET_FLAG(MODEM_NEED_INIT))
   {
     const __FlashStringHelper* cmd[] = {
       F("AT+DDET=1"),         // вкл. DTMF. 
@@ -613,7 +630,7 @@ void MODEM::reinit_end()
 
     DEBUG_PRINTLN(F("init end"));
 
-    SET_FLAG_ZERO(MODEM_NEED_INIT_MODEM);  
+    SET_FLAG_ZERO(MODEM_NEED_INIT);  
   }     
 }
 
@@ -638,10 +655,11 @@ int memoryFree()
 
 void MODEM::flags_info()
 {
-  FLAG_STATUS(GUARD_ENABLE, "GUARD=");
-  FLAG_STATUS(RING_ENABLE,  "TEL=");
-  FLAG_STATUS(GPRS_ENABLE,  "GPRS=");
-  FLAG_STATUS(SMS_ENABLE,   "SMS=");
+  FLAG_STATUS(GUARD_ENABLE,   "GUARD=");
+  FLAG_STATUS(RING_ENABLE,    "TEL=");
+  FLAG_STATUS(GPRS_ENABLE,    "GPRS=");
+  FLAG_STATUS(CONNECT_ALWAYS, "CONNECT=");
+  FLAG_STATUS(SMS_ENABLE,     "SMS=");
 }
 
 void MODEM::wiring() // прослушиваем телефон
@@ -713,11 +731,13 @@ void MODEM::wiring() // прослушиваем телефон
       case GPRS_ON_OFF:
         INVERT_FLAG(GPRS_ENABLE);
         flags_info();
-        if(GET_FLAG(GPRS_ENABLE)) opros_time = REGULAR_OPROS_TIME_GPRS;
-        else opros_time = REGULAR_OPROS_TIME_SMS;
         break;
       case SMS_ON_OFF:
         INVERT_FLAG(SMS_ENABLE);
+        flags_info();             
+        break;
+      case CONNECT_ON_OFF:
+        INVERT_FLAG(CONNECT_ALWAYS);
         flags_info();             
         break;
       case BAT_CHARGE:
@@ -777,46 +797,36 @@ void MODEM::wiring() // прослушиваем телефон
     if(gprs_init_count > RESET_COUNT)
     {
       // если gprs не подключается, переходим на смс
-      if(GET_FLAG(SMS_ENABLE)) SET_FLAG_ZERO(GPRS_ENABLE);
+      if(GET_FLAG(SMS_ENABLE))
+      {
+        gprs_init_count = 0;
+        SET_FLAG_ZERO(GPRS_ENABLE);
+      } 
       else DTMF[0]=MODEM_RESET;
     }   
    
-    reinit_end(); 
+    reinit_end();
+
+    reset_count++;
 
     // Есть данные для отправки
     if(email_buffer->index)
     {
-      if(gsm_operator == op_count)
+      if(GET_FLAG(GPRS_ENABLE))
       {
-        SERIAL_PRINTLN(F("AT+COPS?"));
-        reset_count++;
-      }
-      else
-      {
-        if(GET_FLAG(GPRS_ENABLE))
+        if(gsm_operator == op_count)
         {
-          if(!GET_FLAG_ANSWER(smtpsend_end))
-          { // проверяем подключение к интернету
-            gprs_init_count++;
-            GPRS_GET_IP; // устанавливаем соединение с интернетом            
-          }  
+          SERIAL_PRINTLN(F("AT+COPS?"));   
         }
-        else
-        if(GET_FLAG(SMS_ENABLE) && admin.phone[0])
-        { // отправка смс
-          // "AT+CMGS=\"+79xxxxxxxxx\""
-          SERIAL_PRINT(F("AT+CMGS=\""));
-          SERIAL_PRINT(admin.phone);
-          SERIAL_PRINTLN('\"'); 
-          reset_count++;
-        }
-        else email_buffer->Clear();
-      }      
-    } // проверяем непрочитанные смс и уровень сигнала
+        else GPRS_GET_IP; // Если не идёт отправка сообщения, получаем IP адрес                
+      }
+      else SEND_SMS
+      else email_buffer->Clear();            
+    }
     else
     {
       sleep();
-      reset_count++;
+      // проверяем непрочитанные смс и уровень сигнала
       SERIAL_PRINTLN(F("AT+CMGL=\"REC UNREAD\",1;+CSQ"));
     } 
         
@@ -853,14 +863,14 @@ void MODEM::email()
       ,F(";+SMTPRCPT=2,0,"), RCPT_BB_ADDRESS_AND_NAME // вторая копия
 #endif
 #endif
-    };    
+    };
 
     size = sizeof(cmd)/sizeof(cmd[0]);
   
     for(i = 0; i < size; i++)
     {
       SERIAL_PRINT(cmd[i]);
-      Serial.flush();
+      SERIAL_FLUSH;
     } 
 
     SERIAL_PRINTLN();
