@@ -7,3 +7,20 @@
 07/01/2019 Удалил из проекта больше не используемые библиотеки Beep и Low-Power. Добавил библиотеки termistor, IR.
 
 Для работы с ИК датчиками необходимо добавить эту библиотеку https://github.com/z3t0/Arduino-IRremote
+
+========================================================================================================
+Если при компиляции появляются непонятные ошибки, попробуйте сделать следующее:
+
+    Tools > Board > Boards Manager
+
+    Wait for downloads to finish.
+
+    Click on "Arduino AVR Boards".
+
+    Select 1.6.21 from the dropdown menu.
+
+    Click "Install".
+
+    Wait for installation to finish.
+
+    Click "Close".
