@@ -7,6 +7,7 @@
 #endif
 
 uint8_t flags = 0;
+bool flag_gprs_connect = false; // показывает, есть ли соединение
 extern MY_SENS *sensors;
 
 enum answer {get_ip, ip_ok, gprs_connect, email_end, smtpsend, smtpsend_end, admin_phone};
@@ -34,15 +35,14 @@ enum answer {get_ip, ip_ok, gprs_connect, email_end, smtpsend, smtpsend_end, adm
 #define REGULAR_OPROS_TIME  10000
 uint32_t opros_time;
 
-#define GPRS_GET_IP       if(answer_flags==0){SERIAL_PRINTLN(F("AT+SAPBR=2,1"));SET_FLAG_ANSWER_ONE(get_ip);gprs_init_count++;opros_time=85000;}
-#define GPRS_CONNECT(op)  if(answer_flags==0){SERIAL_PRINT(F("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\";+SAPBR=3,1,\"APN\",\"internet\";+SAPBR=3,1,\"USER\",\"")); \
+#define GPRS_GET_IP       if(!answer_flags && flag_gprs_connect){SERIAL_PRINTLN(F("AT+SAPBR=2,1"));SET_FLAG_ANSWER_ONE(get_ip);gprs_init_count++;}
+#define GPRS_CONNECT(op)  if(!answer_flags && !flag_gprs_connect){SERIAL_PRINT(F("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\";+SAPBR=3,1,\"APN\",\"internet\";+SAPBR=3,1,\"USER\",\"")); \
                           SERIAL_PRINT(PGM_TO_CHAR(op.user));SERIAL_PRINT(F("\";+SAPBR=3,1,\"PWD\",\""));SERIAL_PRINT(PGM_TO_CHAR(op.user));\
-                          SERIAL_PRINTLN(F("\";+SAPBR=1,1"));SET_FLAG_ANSWER_ONE(gprs_connect);}
-#define GPRS_DISCONNECT   {SERIAL_PRINTLN(F("AT+SAPBR=0,1"));}
+                          SERIAL_PRINTLN(F("\";+SAPBR=1,1"));SET_FLAG_ANSWER_ONE(gprs_connect);flag_gprs_connect=true;}
+#define GPRS_DISCONNECT   if(flag_gprs_connect){SERIAL_PRINTLN(F("AT+SAPBR=0,1"));answer_flags=0;flag_gprs_connect=false;}
 
 // отправка смс AT+CMGS=\"+79xxxxxxxxx\"
 #define SEND_SMS  if(GET_FLAG(SMS_ENABLE) && admin.phone[0]){SERIAL_PRINT(F("AT+CMGS=\""));SERIAL_PRINT(admin.phone);SERIAL_PRINTLN('\"');}
-
 // ****************************************
 #define ADMIN_PHONE_SET_ZERO  memset(&admin,0,sizeof(ABONENT_CELL))
 
@@ -178,6 +178,7 @@ void MODEM::reinit()
 
   reset_count = 0;
   gprs_init_count = 0;
+  flag_gprs_connect=false;
   CLEAR_FLAG_ANSWER;
   opros_time = REGULAR_OPROS_TIME;
   timeRegularOpros = millis();
@@ -298,7 +299,6 @@ void MODEM::parser()
     if(GET_FLAG_ANSWER(get_ip))
     {
       SET_FLAG_ANSWER_ZERO(get_ip);
-      GPRS_CONNECT(op_base[gsm_operator]);
     }
 
     if(GET_FLAG_ANSWER(ip_ok))
@@ -310,6 +310,7 @@ void MODEM::parser()
     if(GET_FLAG_ANSWER(gprs_connect))
     {
       SET_FLAG_ANSWER_ZERO(gprs_connect);
+      GPRS_GET_IP;
     }
   }
 
@@ -592,18 +593,17 @@ void MODEM::parser()
       gprs_init_count = 0;
       email_buffer->Clear();
     }
-    else GPRS_DISCONNECT;
     return;    
   }
 
   if((p = READ_COM_FIND("+SAPBR"))!=NULL)
   {
-    opros_time=REGULAR_OPROS_TIME;
     if((p = READ_COM_FIND(": 1,1"))!=NULL)
     {
       SET_FLAG_ANSWER_ZERO(get_ip);
-      SET_FLAG_ANSWER_ONE(ip_ok);
-    } 
+      SET_FLAG_ANSWER_ONE(ip_ok);      
+    }
+    else flag_gprs_connect=false;
   }   
 //////////////////////////////////////////////////////////// 
 }
@@ -638,7 +638,7 @@ void MODEM::reinit_end()
       if(!GET_MODEM_ANSWER(OK, 10000)) return;
     }   
 
-    DTMF[0] = EMAIL_ADMIN_PHONE;
+    if(!admin.phone[0]) DTMF[0] = EMAIL_ADMIN_PHONE;
 
     timeRegularOpros = millis();        
 
@@ -814,6 +814,7 @@ void MODEM::wiring() // прослушиваем телефон
       {
         gprs_init_count = 0;
         SET_FLAG_ZERO(GPRS_ENABLE);
+        GPRS_DISCONNECT
       } 
       else DTMF[0]=MODEM_RESET;
     }   
@@ -825,22 +826,29 @@ void MODEM::wiring() // прослушиваем телефон
     // Есть данные для отправки
     if(email_buffer->index)
     {
-      if(GET_FLAG(GPRS_ENABLE))
+      if(!GET_FLAG(MODEM_NEED_INIT))
       {
-        if(gsm_operator == op_count)
+        if(GET_FLAG(GPRS_ENABLE))
         {
-          SERIAL_PRINTLN(F("AT+COPS?"));   
+          if(gsm_operator == op_count)
+          {
+            SERIAL_PRINTLN(F("AT+COPS?"));   
+          }
+          else
+          {
+            GPRS_CONNECT(op_base[gsm_operator])
+            else GPRS_GET_IP
+          }                 
         }
-        else GPRS_GET_IP; // Если не идёт отправка сообщения, получаем IP адрес                
-      }
-      else SEND_SMS
-      else email_buffer->Clear();            
+        else SEND_SMS
+        else email_buffer->Clear();
+      }            
     }
     else
     {
       sleep();
-      // проверяем непрочитанные смс и уровень сигнала
-      SERIAL_PRINTLN(F("AT+CMGL=\"REC UNREAD\",1;+CSQ"));
+      // проверяем уровень сигнала
+      SERIAL_PRINTLN(F("AT+CSQ"));
     } 
         
     timeRegularOpros = millis();       
