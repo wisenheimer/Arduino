@@ -372,6 +372,7 @@ void MODEM::parser()
     {
       if(READ_COM_FIND_RAM(admin.phone)==NULL && admin.phone[0]) // не админ
       {
+        RING_BREAK;
         if(GET_FLAG(GUARD_ENABLE)) DTMF[0] = GUARD_OFF;
         else DTMF[0] = GUARD_ON;
       }
