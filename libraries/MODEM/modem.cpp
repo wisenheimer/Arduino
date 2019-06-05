@@ -77,13 +77,14 @@ typedef struct PROGMEM
 #define ADD_OP(index,name,user) const char op_##index[]    PROGMEM=name; \
                                 const char user_##index[]  PROGMEM=user
 
+// Пароли для входа в интернет
 ADD_OP(0, "MTS",     "mts");
 ADD_OP(1, "MEGAFON", "gdata");
 ADD_OP(2, "MegaFon", "gdata");
-ADD_OP(3, "Tele2",   "");
-ADD_OP(4, "MOTIV",   "");
-ADD_OP(5, "Beeline", "beeline");
-ADD_OP(6, "Bee Line", "beeline");
+ADD_OP(3, "Beeline", "beeline");
+ADD_OP(4, "Bee Line", "beeline");
+// Все операторы с пустым паролем (Tele2, MOTIV, ALTEL и т.д.)
+ADD_OP(5, "ANYOP", "");  
 
 const OPERATORS op_base[] PROGMEM = {
   {op_0, user_0},
@@ -91,8 +92,7 @@ const OPERATORS op_base[] PROGMEM = {
   {op_2, user_2},
   {op_3, user_3},
   {op_4, user_4},
-  {op_5, user_5},
-  {op_6, user_6}
+  {op_5, user_5}
 };
 
 // Условия для рестарта модема
@@ -159,7 +159,7 @@ extern "C"{
 MODEM::MODEM()
 {
   op_count = sizeof(op_base)/sizeof(OPERATORS);
-  gsm_operator = op_count;
+  gsm_operator = op_count - 1;
   // зуммер
   BEEP_INIT;
   // Устанавливаем скорость связи Ардуино и модема
@@ -174,9 +174,19 @@ MODEM::~MODEM()
 
 void MODEM::reinit()
 {
-  DEBUG_PRINTLN(F("BOOT"));
+  uint8_t i, count = 10;
 
-  POWER_ON; // Включение GSM модуля
+  do
+  {
+    DEBUG_PRINTLN(F("BOOT"));
+    POWER_ON; // Включение GSM модуля
+    for (i = 0; i < count; ++i)
+    {
+      /* code */
+      SERIAL_PRINTLN(F("AT"));
+      if(GET_MODEM_ANSWER(OK, 1000)) break;
+    }
+  }while (count==i);
 
   SET_FLAG_ONE(MODEM_NEED_INIT);
 
@@ -273,7 +283,7 @@ void MODEM::sleep()
     if(GET_FLAG(GPRS_ENABLE)) email_buffer->AddText_P(PSTR("WakeUp:"));
 
 #if WTD_ENABLE
-  wdt_enable(WDTO_8S);
+    wdt_enable(WDTO_8S);
 #endif   
   }
 #endif 
@@ -399,12 +409,13 @@ void MODEM::parser()
 
     return;
   }
-
-  if(gsm_operator == op_count)
+  
+  if(READ_COM_FIND("COPS: 0,0")!=NULL)
   {
     gsm_operator = 0;
-    while (gsm_operator < op_count && READ_COM_FIND_P(op_base[gsm_operator].op)==NULL) gsm_operator++;
-  } 
+    while (gsm_operator < op_count-1 && READ_COM_FIND_P(op_base[gsm_operator].op)==NULL) gsm_operator++;
+    return;
+  }
 
   if((p = READ_COM_FIND("DTMF:"))!=NULL) //+DTMF: 2
   { 
@@ -641,7 +652,13 @@ void MODEM::reinit_end()
     {
       SERIAL_PRINTLN(cmd[i]);
       if(!GET_MODEM_ANSWER(OK, 10000)) return;
-    }   
+    }
+
+    do
+    {
+      SERIAL_PRINTLN(F("AT+COPS?"));
+    }
+    while (!GET_MODEM_ANSWER("+COPS: 0,0", 10000));
 
     if(!admin.phone[0]) DTMF[0] = EMAIL_ADMIN_PHONE;
 
@@ -835,21 +852,14 @@ void MODEM::wiring() // прослушиваем телефон
       {
         if(GET_FLAG(GPRS_ENABLE))
         {
-          if(gsm_operator == op_count)
-          {
-            SERIAL_PRINTLN(F("AT+COPS?"));   
-          }
-          else
-          {
-            GPRS_CONNECT(op_base[gsm_operator])
-            else GPRS_GET_IP
-          }                 
+          GPRS_CONNECT(op_base[gsm_operator])
+          else GPRS_GET_IP                           
         }
         else SEND_SMS
         else email_buffer->Clear();
       }            
     }
-    else
+    else if(!GET_FLAG(MODEM_NEED_INIT))
     {
       sleep();
       // проверяем уровень сигнала
@@ -938,6 +948,7 @@ bool MODEM::read_com(const char* answer)
       {
         reset_count = 0;
         timeRegularOpros = millis();
+        parser();
         if(answer!=NULL)
         {
           if(strstr_P(text->GetText(),answer)!=NULL)
@@ -945,8 +956,7 @@ bool MODEM::read_com(const char* answer)
             text->Clear();
             return true;
           }
-        }            
-        parser();        
+        }                    
       }
       text->Clear();      
     }
