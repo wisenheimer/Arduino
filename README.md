@@ -14,6 +14,7 @@ https://github.com/wisenheimer/Signaling-Blynk
 Для работы со старой схемой требуется привести в соответствие номера зарезервированных пинов
 
 #define	BOOT_PIN  5 // перезагрузка модема
+
 #define RADAR_PIN 6 // микроволновый датчик движения RCWL-0516
 
 здесь https://github.com/wisenheimer/Signaling-Blynk/blob/master/libraries/main_type/main_type.h
